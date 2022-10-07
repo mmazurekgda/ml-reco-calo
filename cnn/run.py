@@ -1,14 +1,10 @@
 import numpy as np
-from tabulate import tabulate
-from cnn.config import Config
+#from tabulate import tabulate
 import tensorflow as tf
-import os
-import json
 import time
 import pandas as pd
-#from z_score_getter import Normalizer
-from collections import defaultdict
-#import copy
+import logging as log
+import argparse
 
 from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
@@ -16,40 +12,49 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     TensorBoard
 )
-import inspect
-
 
 # local
+from cnn.config import Config
 from cnn.dataset import Dataset
 from cnn.core import YOLOCore
 
 
-def print_n_dump(message):
-    print(message)
-    with open("{}/conf.log".format(Config.conf_timestamp), "a+") as conf_dump:
-        conf_dump.write(message)
-        conf_dump.write('\n')
-
-# FIXME: maybe a bit more generic
 class CNN(YOLOCore):
-    def __init__(self):
-        super().__init__()
-        self.batch_size = Config.batch_size
-        #self.model = Config.model
-        self.epochs = Config.epochs
-        self.validation_samples = Config.validation_samples
-        self.dataset_cache = Config.dataset_cache
-        self.early_stopping_patience = Config.early_stopping_patience
-        self.reduce_lr_patience = Config.reduce_lr_patience
-        self.reduce_lr_cooldown = Config.reduce_lr_cooldown
-        self.learning_rate = Config.learning_rate
-        self.anchors = Config.anchors
-        self.anchor_masks = Config.anchor_masks
-        self.backbone = Config.backbone
-        #self.dataset_loader = Config.dataset_loader
-        self.iou_ignore = Config.iou_ignore
-        self.load_weight_path = Config.load_weight_path
-        self.out_weight_path = Config.out_weight_path
+
+    def __init__(self,
+        model,
+        dataloader,
+        config=Config(),
+        logger_level=log.CRITICAL,
+    ):
+        super().__init__(
+            config=config,
+            logger_level=logger_level,
+        )
+
+        if not model:
+            log.error("Model not specified")
+        self.model = model
+
+        if not dataloader:
+            log.error("Dataloader not specified")
+        self.dataloader = dataloader
+
+        # set default properties
+        # self.batch_size = Config.batch_size
+        # self.epochs = Config.epochs
+        # self.validation_samples = Config.validation_samples
+        # self.dataset_cache = Config.dataset_cache
+        # self.early_stopping_patience = Config.early_stopping_patience
+        # self.reduce_lr_patience = Config.reduce_lr_patience
+        # self.reduce_lr_cooldown = Config.reduce_lr_cooldown
+        # self.learning_rate = Config.learning_rate
+        # self.anchors = Config.anchors
+        # self.anchor_masks = Config.anchor_masks
+        # self.backbone = Config.backbone
+        # self.iou_ignore = Config.iou_ignore
+        # self.load_weight_path = Config.load_weight_path
+        # self.out_weight_path = Config.out_weight_path
 
 
     def transform_dataset(self, x, y):
@@ -110,22 +115,39 @@ class CNN(YOLOCore):
         ds = self.parse_dataset(ds)
         vs = self.parse_dataset(vs)
 
-        callbacks = [
-            ReduceLROnPlateau(
-                verbose=1,
-                patience=self.reduce_lr_patience,
-                cooldown=self.reduce_lr_cooldown,
-            ),
-            EarlyStopping(patience=self.early_stopping_patience, verbose=1, restore_best_weights=True),
-            ModelCheckpoint(self.out_weight_path, verbose=1, save_weights_only=True, save_best_only=False),
+        # Callbacks
+        callbacks = []
+        if self.reduce_lr:
+            callbacks.append(
+                ReduceLROnPlateau(
+                    verbose=self.reduce_lr_verbosity,
+                    patience=self.reduce_lr_patience,
+                    cooldown=self.reduce_lr_cooldown,
+                )
+            )
+        if early_stopping:
+            callbacks.append(
+                EarlyStopping(
+                    patience=self.early_stopping_patience,
+                    verbose=self.early_stopping_verbosity,
+                    restore_best_weights=self.early_stopping_restore,
+                )
+            )
+        if model_checkpoint:
+            callbacks.append(
+                ModelCheckpoint(
+                    self.model_checkpoint_out_weight_path,
+                    verbose=self.model_checkpoint_verbose,
+                    save_weights_only=self.save_weights_only,
+                    save_best_only=self.save_best_only,
+                ),
+            )
             #TensorBoard(log_dir=Config.tensorboard_dir,
             #            histogram_freq=1, batch_size=Config.batch_size, write_grads=True, write_graph=True)
-        ]
 
         #with tf.distribute.MirroredStrategy().scope():
             #model = eval("model_{}".format(backbone))(training=True)
-        self.model = self.model_structure()
-        print(self.model.summary())
+        log.debug(self.model.summary())
         if self.load_weight_path:
             self.model.load_weights(self.load_weight_path)
 
@@ -147,7 +169,8 @@ class CNN(YOLOCore):
             validation_steps=self.validation_samples,
             callbacks=callbacks,
         )
-        #print_n_dump("Finished training at {}".format(time.strftime("%d-%m-%Y %H:%M:%S")))
+
+
 """
 if __name__ == "__main__":
     if not os.path.exists(Config.conf_timestamp):

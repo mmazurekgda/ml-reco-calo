@@ -8,21 +8,29 @@ from tensorflow.keras.losses import (
 from cnn.config import Config
 from cnn.backbone import DarknetConv
 import sys
+from utils import activate_logger
+import logging as log
 
 class YOLOCore():
 
-    def __init__(self):
-        self.classes_no = Config.classes_no
-        self.target_img_width = Config.target_img_width
-        self.target_img_height = Config.target_img_height
-        self.granularities = Config.granularities
+    def __init__(self, config=Config(), logger_level=log.CRITICAL):
+        self.config = config
+        if logger_level:
+            activate_logger(logger_level=logger_level)
+
+
+
+        # self.classes_no = Config.classes_no
+        # self.target_img_width = Config.target_img_width
+        # self.target_img_height = Config.target_img_height
+        # self.granularities = Config.granularities
         # LOSS
-        self.iou_ignore = Config.iou_ignore
+        # self.iou_ignore = Config.iou_ignore
         # NON MAXIMUM SUPPRESSION
-        self.iou_threshold = Config.iou_threshold
-        self.score_threshold = Config.score_threshold
-        self.max_boxes = Config.max_boxes
-        self.soft_nms_sigma = Config.soft_nms_sigma
+        # self.iou_threshold = Config.iou_threshold
+        # self.score_threshold = Config.score_threshold
+        # self.max_boxes = Config.max_boxes
+        # self.soft_nms_sigma = Config.soft_nms_sigma
 
     def output(self, filters, anchors_tmp, name=None):
         def yolo_output(x_in):
