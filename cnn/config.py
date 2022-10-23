@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import json
 
 class Config:
 
@@ -6,8 +8,9 @@ class Config:
         'learning_rate': 1e-4,
         'epochs': 30,
         'batch_size': 1,
-        'samples': 100,
-        'validation_samples': 100,
+        # 'samples': 100,
+        # 'validation_samples': 100,
+        # 'validation_split': .2,
         'iou_ignore': .5,
         'dataset_cache': False,
         # 'shuffle_buffer_size': = 1000  # None = do not shuffle
@@ -23,11 +26,22 @@ class Config:
         'reduce_lr_cooldown': 5,
         # model checkpoint
         'model_checkpoint': True,
+        'model_checkpoint_verbosity': 1,
         'model_checkpoint_out_weight_path': 'weights.tf',
         'model_checkpoint_save_weights_only': True,
         'model_checkpoint_save_best_only': True,
         # tensorboard
         # tensorboard_dir = '{}/logs'.format(conf_timestamp)
+        'load_weight_path': None,
+
+    }
+
+    TFRECORDS_DATALOADER = {
+        'tfrecords_files': '',
+        'tfrecords_validation_files': '',
+        'tfrecords_buffer_size': None,
+        'tfrecords_num_parallel_reads': os.cpu_count(),
+        'tfrecords_compression_type': 'ZLIB',
     }
 
     INFERENCE_OPTIONS = {
@@ -44,6 +58,7 @@ class Config:
         'target_img_width': 384,
         'target_img_height': 312,
         'channels': 1,
+        'energy_cols_no': 1,
     }
 
     CNN_OPTIONS = {
@@ -64,32 +79,69 @@ class Config:
         ],
     }
 
-    OPTIONS = {
+    CONFIGURABLE_OPTIONS = {
         **TRAINING_OPTIONS,
+        **TFRECORDS_DATALOADER,
         **INFERENCE_OPTIONS,
         **DATA_OPTIONS,
         **CNN_OPTIONS,
     }
 
-    def __init__(self):
-        for prop, value in self.OPTIONS.items():
-            setattr(self, prop, value)
-        self.anchors = self.anchors_not_parsed / [self.img_width, self.img_height]
-        self.classes_no = len(self.classes) if isinstance(self.classes, list) else 1
+    NON_CONFIGURABLE_OPTIONS = {
+        'anchors': np.ndarray([]),
+        'classes_no': 0,
+        'features_no': 0,
+    }
 
-    '''
-    def normalize_image(x):
-        return (x - Config.digits_mean) / Config.digits_std
-        #return tf.where(tf.less(x - Config.min_digit, 1.0), 0.0, ((x - Config.min_digit) / math.log(10.0)) / (Config.max_digit - Config.min_digit))
-        #return tf.where(tf.less(x - Config.min_digit, 0.0), 0.0, ((x - Config.min_digit) / (Config.max_digit - Config.min_digit)))
-        #return tf.where(tf.less(x, Config.min_digit), 1.0,  tf.math.log(x - Config.min_digit + 1.) / math.log(10.) / math.log10(Config.max_digit - Config.min_digit + 1.))
-        #return tf.where(tf.less(x, Config.min_digit), 0.0,  tf.math.log(x - Config.min_digit + 1.) / math.log(10.) / math.log10(Config.max_digit - Config.min_digit + 1.))
+    OPTIONS = {
+        **CONFIGURABLE_OPTIONS,
+        **NON_CONFIGURABLE_OPTIONS,
+    }
 
-    def transform_energy(energy):
-        return (tf.convert_to_tensor(energy) - Config.particles_mean) / Config.particles_std
-        #return (tf.convert_to_tensor(energy) - Config.min_energy) / (Config.max_energy - Config.min_energy)
+    _frozen = False
 
-    def retransform_energy(energy):
-        return tf.convert_to_tensor(energy) * Config.particles_std + Config.particles_mean
-        #return tf.convert_to_tensor(energy) * (Config.max_energy - Config.min_energy) + Config.min_energy
-    '''
+    def __setattr__(self, key, value):
+        if self._frozen and not hasattr(self, key):
+            raise TypeError( "%r is a frozen class" % self )
+        object.__setattr__(self, key, value)
+
+    def __init__(self, load_config_file=None):
+        if load_config_file:
+            with open(load_config_file) as json_dump:
+                data = json.load(json_dump)
+                for prop, value in json.loads(data).items():
+                    setattr(self, prop, self._safe_object(prop, value))
+        else:
+            for prop, value in self.OPTIONS.items():
+                setattr(self, prop, value)
+        self._frozen = True
+        if not load_config_file:
+            self.anchors = self.anchors_not_parsed / [self.img_width, self.img_height]
+            self.classes_no = len(self.classes) if isinstance(self.classes, list) else 1
+            self.features_no = 4 + self.energy_cols_no + self.classes_no
+
+    def _safe_JSON(self, value):
+        if type(value) is np.ndarray:
+            return value.tolist()
+        return value
+
+    def _safe_object(self, key, value):
+        if key in ['anchors_not_parsed', 'anchors_masks', 'anchors']:
+            return np.array(value)
+        return value
+
+    def to_JSON(self):
+        options_copy = { key: self._safe_JSON(getattr(self, key)) for key in self.OPTIONS }
+        return json.dumps(options_copy, sort_keys=True, indent=4)
+
+    def dump_to_file(self, config_file):
+        with open(config_file, 'w') as json_dump:
+            json.dump(self.to_JSON(), json_dump)
+
+    # FIXME: workaround for methods defined in core
+    def refine_boxes(self, pred, anchors):
+        raise NotImplementedError
+
+    # FIXME: workaround for methods defined in core
+    def nms(self, outputs):
+        raise NotImplementedError

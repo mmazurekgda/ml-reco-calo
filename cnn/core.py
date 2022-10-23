@@ -8,49 +8,49 @@ from tensorflow.keras.losses import (
 from cnn.config import Config
 from cnn.backbone import DarknetConv
 import sys
-from utils import activate_logger
 import logging as log
 
-class YOLOCore():
+class CNNCore():
 
-    def __init__(self, config=Config(), logger_level=log.CRITICAL):
+    def __init__(self, config=Config()):
         self.config = config
-        if logger_level:
-            activate_logger(logger_level=logger_level)
+        self.config.refine_boxes = self.refine_boxes
+        self.config.nms = self.nms
 
-
-
-        # self.classes_no = Config.classes_no
-        # self.target_img_width = Config.target_img_width
-        # self.target_img_height = Config.target_img_height
-        # self.granularities = Config.granularities
+        self.log = log.getLogger("MCRecoCalo")
+        log.getLogger('tensorflow').setLevel(self.log.level)
+        # self.config.classes_no = Config.classes_no
+        # self.config.target_img_width = Config.target_img_width
+        # self.config.target_img_height = Config.target_img_height
+        # self.config.granularities = Config.granularities
         # LOSS
-        # self.iou_ignore = Config.iou_ignore
+        # self.config.iou_ignore = Config.iou_ignore
         # NON MAXIMUM SUPPRESSION
-        # self.iou_threshold = Config.iou_threshold
-        # self.score_threshold = Config.score_threshold
-        # self.max_boxes = Config.max_boxes
-        # self.soft_nms_sigma = Config.soft_nms_sigma
+        # self.config.iou_threshold = Config.iou_threshold
+        # self.config.score_threshold = Config.score_threshold
+        # self.config.max_boxes = Config.max_boxes
+        # self.config.soft_nms_sigma = Config.soft_nms_sigma
 
+    '''
     def output(self, filters, anchors_tmp, name=None):
         def yolo_output(x_in):
             x = inputs = Input(x_in.shape[1:])
             x = DarknetConv(x, filters * 2, 3)
-            x_boxes = DarknetConv(x, anchors_tmp * (self.classes_no + 5), 1, batch_norm=False)
-            x_boxes = Lambda(lambda x: tf.reshape(x, (-1, tf.shape(x)[1], tf.shape(x)[2], anchors_tmp, (self.classes_no + 5))))(x_boxes)
-            x_boxes_left, x_boxes_right = Lambda(lambda x: tf.split(x, (4, 1 + self.classes_no), axis=-1))(x_boxes)
+            x_boxes = DarknetConv(x, anchors_tmp * (self.config.classes_no + 5), 1, batch_norm=False)
+            x_boxes = Lambda(lambda x: tf.reshape(x, (-1, tf.shape(x)[1], tf.shape(x)[2], anchors_tmp, (self.config.classes_no + 5))))(x_boxes)
+            x_boxes_left, x_boxes_right = Lambda(lambda x: tf.split(x, (4, 1 + self.config.classes_no), axis=-1))(x_boxes)
             x_energy = Dense(anchors_tmp * 1)(x)
             x_energy = Lambda(lambda x: tf.reshape(x, (-1, tf.shape(x)[1], tf.shape(x)[2], anchors_tmp, 1)))(x_energy)
             x = Lambda(lambda x: tf.concat([x[0], x[2], x[1]], -1))([x_boxes_left, x_boxes_right, x_energy])
             return tf.keras.Model(inputs, x, name=name)(x_in)
         return yolo_output
-
+    '''
     def refine_boxes(self, pred, anchors):
         # YOLO's anchor boxes refinement
         # pred: (batch_size, grid_y, grid_x, anchors, (x, y, w, h, energy, obj, ...classes_no))
         grid_size_y = tf.shape(pred)[1]
         grid_size_x = tf.shape(pred)[2]
-        box_xy, box_wh, energy, objectness, class_probs = tf.split(pred, (2, 2, 1, 1, self.classes_no), axis=-1)
+        box_xy, box_wh, energy, objectness, class_probs = tf.split(pred, (2, 2, 1, 1, self.config.classes_no), axis=-1)
 
         box_xy = tf.sigmoid(box_xy)
         objectness = tf.sigmoid(objectness)
@@ -93,7 +93,7 @@ class YOLOCore():
         boxes = tf.reshape(bbox, (-1, 4))
         scores = tf.reshape(scores, [-1])
         energy = tf.reshape(energy, [-1])
-        class_probs = tf.reshape(class_probs, (-1, self.classes_no))
+        class_probs = tf.reshape(class_probs, (-1, self.config.classes_no))
         # classes_no = class_probs
 
         # above_thr = tf.squeeze(tf.where(tf.greater_equal(scores, 0.5)))
@@ -118,10 +118,10 @@ class YOLOCore():
             boxes=boxes,
             scores=scores,
             # max_output_size_per_class=max_boxes,
-            max_output_size=self.max_boxes,
-            iou_threshold=self.iou_threshold,
-            score_threshold=self.score_threshold,
-            soft_nms_sigma=self.soft_nms_sigma
+            max_output_size=self.config.max_boxes,
+            iou_threshold=self.config.iou_threshold,
+            score_threshold=self.config.score_threshold,
+            soft_nms_sigma=self.config.soft_nms_sigma
         )
 
         boxes = tf.gather(boxes, indices=indices)
@@ -211,7 +211,7 @@ class YOLOCore():
             best_iou = tf.reduce_max(self.broadcast_iou(pred_box, true_box_flat), axis=-1)
             # ignore_mask =  iou < threshold ? 0.0 : 1.0
             # TODO: try running YOLO on ignore thresholds bigger than 0.5
-            ignore_mask = tf.cast(best_iou < self.iou_ignore, tf.float32)
+            ignore_mask = tf.cast(best_iou < self.config.iou_ignore, tf.float32)
 
             # 5. calculate all losses
             # objectness x choose_smaller_boxes x
@@ -235,7 +235,7 @@ class YOLOCore():
         return yolo_loss
 
     def loss(self):
-        return [self.yolo_loss(self.anchors[mask]) for mask in self.anchor_masks]
+        return [self.yolo_loss(self.config.anchors[mask]) for mask in self.config.anchor_masks]
 
     def transform_targets_for_output(self, y_true, grid_size_x, grid_size_y, anchor_idxs):
         # y_true: (boxes, (x1, y1, x2, y2, energy, class, best_anchor))
@@ -284,12 +284,12 @@ class YOLOCore():
 
     def transform_targets(self, y_train):
         y_outs = []
-        grid_sizes = [(self.target_img_width // granularity_x, self.target_img_height // granularity_y) for granularity_x, granularity_y in self.granularities]
+        grid_sizes = [(self.config.target_img_width // granularity_x, self.config.target_img_height // granularity_y) for granularity_x, granularity_y in self.config.granularities]
 
         # calculate anchor index for true boxes
         # y_train = tf.sparse.to_dense(y_train.to_sparse())
         y_train = tf.expand_dims(y_train, axis=0)
-        anchors_tf = tf.cast(self.anchors, tf.float32)
+        anchors_tf = tf.cast(self.config.anchors, tf.float32)
         anchor_area = anchors_tf[..., 0] * anchors_tf[..., 1]  # 10x13= 130
         box_wh = y_train[..., 2:4] - y_train[..., 0:2]
         box_wh = tf.tile(tf.expand_dims(box_wh, -2), (1, 1, tf.shape(anchors_tf)[0], 1))
@@ -300,13 +300,13 @@ class YOLOCore():
         anchor_idx = tf.expand_dims(anchor_idx, axis=-1)
         y_train = tf.concat([y_train, anchor_idx], axis=-1)
 
-        for anchor_idxs, (grid_size_x, grid_size_y) in zip(self.anchor_masks, grid_sizes):
+        for anchor_idxs, (grid_size_x, grid_size_y) in zip(self.config.anchor_masks, grid_sizes):
             y_outs.append(self.transform_targets_for_output(y_train, grid_size_x, grid_size_y, anchor_idxs))
 
         return tuple(y_outs)
 
     def transform_images(self, x_train):
-        return tf.image.resize(x_train, (self.target_img_height, self.target_img_width))
+        return tf.image.resize(x_train, (self.config.target_img_height, self.config.target_img_width))
 
 
 
