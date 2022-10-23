@@ -5,25 +5,31 @@ import sys
 
 def activate_logger(
     directory: str = None,
-    parsed_start_time: str = None,
     logger_level: str = 'INFO',
+    root_logger_level: str = 'WARN',
+    stdout = None,
 ):
+    chosen_stdout = stdout
+    if not chosen_stdout:
+        chosen_stdout = sys.stdout
     handlers = [
-        log.StreamHandler(sys.stdout),
+        log.StreamHandler(chosen_stdout),
     ]
-    prefix_format='%(levelname)s: %(message)s',
+    prefix_format="%(levelname)s: %(message)s"
     if directory:
         logger_file = f"{directory}/output.log"
         print("Activating the logger in " + logger_file)
         handlers.append(log.FileHandler(logger_file))
-        prefix_format='%(asctime)s %(levelname)s: %(message)s'
+        prefix_format="%(asctime)s %(levelname)s: %(message)s"
 
     log.basicConfig(
         handlers=handlers,
         format=prefix_format,
-        datefmt='%m/%d/%Y %I:%M:%S %p',
-        level=getattr(log, logger_level),
+        datefmt="%m/%d/%Y %I:%M:%S %p",
+        level=getattr(log, root_logger_level),
     )
+    logger = log.getLogger('MCRecoCalo')
+    logger.setLevel(getattr(log, logger_level))
 
 def x_cell_to_pos(x, grid_x_cells, grid_x_min, grid_x_max):
     return x / grid_x_cells * (grid_x_max - grid_x_min) + grid_x_min
