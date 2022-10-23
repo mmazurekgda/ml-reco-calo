@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import json
+import logging
 
 class Config:
 
@@ -99,26 +100,46 @@ class Config:
     }
 
     _frozen = False
+    _rigid = False
 
     def __setattr__(self, key, value):
-        if self._frozen and not hasattr(self, key):
-            raise TypeError( "%r is a frozen class" % self )
+        if self._frozen and key != '_frozen':
+            raise TypeError( f"Config became a frozen class. No futher changes possible. Tried setting '{key}': '{value}'")
+        if self._rigid and not hasattr(self, key):
+            raise TypeError( f"Config became a rigid class. No additional options possible. Tried setting '{key}': '{value}'")
         object.__setattr__(self, key, value)
 
-    def __init__(self, load_config_file=None):
+    def __init__(self, load_config_file=None, freeze=False):
+        self.log = logging.getLogger('MCRecoCalo')
+        self.log.info(f"Initialized a new config.")
         if load_config_file:
+            self.log.debug(f"-> Loading options from file: {load_config_file}.")
             with open(load_config_file) as json_dump:
                 data = json.load(json_dump)
                 for prop, value in json.loads(data).items():
-                    setattr(self, prop, self._safe_object(prop, value))
+                    parsed_value = self._safe_object(prop, value)
+                    self.log.debug(f"--> Overriding {prop} with {parsed_value}.")
+                    setattr(self, prop, parsed_value)
         else:
+            self.log.debug("-> No config file given. Setting default values.")
             for prop, value in self.OPTIONS.items():
                 setattr(self, prop, value)
-        self._frozen = True
+        self.log.debug("-> Making the options rigid. No additional members possible.")
+        self._rigid = True
         if not load_config_file:
             self.anchors = self.anchors_not_parsed / [self.img_width, self.img_height]
             self.classes_no = len(self.classes) if isinstance(self.classes, list) else 1
             self.features_no = 4 + self.energy_cols_no + self.classes_no
+        if freeze:
+            self._freeze()
+
+    def _freeze(self):
+        self._frozen = True
+        self.log.debug("-> Freezing options. No additional changes possible.")
+
+    def _unfreeze(self):
+        self._frozen = False
+        self.log.debug("-> Unfreezing options. Additional changes possible.")
 
     def _safe_JSON(self, value):
         if type(value) is np.ndarray:
@@ -137,6 +158,17 @@ class Config:
     def dump_to_file(self, config_file):
         with open(config_file, 'w') as json_dump:
             json.dump(self.to_JSON(), json_dump)
+
+    def set_options(self, options: dict = {}, permit_when_frozen=False):
+        was_frozen = bool(self._frozen)
+        if was_frozen and permit_when_frozen:
+            self._unfreeze()
+        for option, value in options.items():
+            self.log.debug(f"-> Setting option {option}: {value}.")
+            setattr(self, option, value)
+        if was_frozen:
+            self._freeze()
+
 
     # FIXME: workaround for methods defined in core
     def refine_boxes(self, pred, anchors):
