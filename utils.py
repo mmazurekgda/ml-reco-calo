@@ -1,7 +1,35 @@
 import numpy as np
 import pandas as pd
-import logging as log
+import logging
 import sys
+
+class CustomFormatter(logging.Formatter):
+
+    GREY = "\x1b[38;20m"
+    GREEN = "\x1b[32;20m"
+    YELLOW = "\x1b[33;20m"
+    RED = "\x1b[31;20m"
+    BOLD_RED = "\x1b[31;1m"
+    RESET = "\x1b[0m"
+
+    FORMATS = {
+        logging.DEBUG: GREY,
+        logging.INFO: GREEN,
+        logging.WARNING: YELLOW,
+        logging.ERROR: RED,
+        logging.CRITICAL: BOLD_RED,
+    }
+
+    def __init__(self, *args, prefix_format="", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prefix_format = prefix_format
+
+    def format(self, record):
+        log_fmt = f"{self.FORMATS.get(record.levelno)}{self.prefix_format}{self.RESET}"
+        if record.levelno >= logging.WARNING:
+           log_fmt +=  " - (%(filename)s:%(lineno)d)"
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
 
 def activate_logger(
     directory: str = None,
@@ -13,23 +41,26 @@ def activate_logger(
     if not chosen_stdout:
         chosen_stdout = sys.stdout
     handlers = [
-        log.StreamHandler(chosen_stdout),
+        logging.StreamHandler(chosen_stdout),
     ]
     prefix_format="%(levelname)s: %(message)s"
     if directory:
         logger_file = f"{directory}/output.log"
         print("Activating the logger in " + logger_file)
-        handlers.append(log.FileHandler(logger_file))
-        prefix_format="%(asctime)s %(levelname)s: %(message)s"
+        handlers.append(logging.FileHandler(logger_file))
+        prefix_format="%(asctime)s - %(levelname)s: %(message)s"
 
-    log.basicConfig(
+    handlers[0].setFormatter(CustomFormatter(prefix_format=prefix_format))
+    logging.basicConfig(
         handlers=handlers,
-        format=prefix_format,
+        format=prefix_format, # for default
         datefmt="%m/%d/%Y %I:%M:%S %p",
-        level=getattr(log, root_logger_level),
+        level=getattr(logging, root_logger_level),
     )
-    logger = log.getLogger('MCRecoCalo')
-    logger.setLevel(getattr(log, logger_level))
+    logger_level = getattr(logging, logger_level)
+    logger = logging.getLogger('MCRecoCalo')
+    logger.setLevel(logger_level)
+    return logger
 
 def x_cell_to_pos(x, grid_x_cells, grid_x_min, grid_x_max):
     return x / grid_x_cells * (grid_x_max - grid_x_min) + grid_x_min
