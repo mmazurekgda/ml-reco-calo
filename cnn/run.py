@@ -22,9 +22,9 @@ from cnn.core import CNNCore
 class CNN(CNNCore):
 
     def __init__(self,
-        model,
-        dataloader,
-        config=Config(),
+        model=None,
+        dataloader=None,
+        config=None,
     ):
         super().__init__(
             config=config,

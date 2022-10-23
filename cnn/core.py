@@ -12,10 +12,16 @@ import logging as log
 
 class CNNCore():
 
-    def __init__(self, config=Config()):
+    def __init__(self, config=None):
+        if not config:
+            raise ValueError("No config passed!")
         self.config = config
-        self.config.refine_boxes = self.refine_boxes
-        self.config.nms = self.nms
+
+        # FIXME: temporary workaround
+        self.config.set_options({
+            'refine_boxes': self.refine_boxes,
+            'nms': self.nms,
+        }, permit_when_frozen=True)
 
         self.log = log.getLogger("MCRecoCalo")
         log.getLogger('tensorflow').setLevel(self.log.level)
