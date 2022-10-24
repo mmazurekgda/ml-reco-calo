@@ -1,3 +1,3 @@
 [submodule "datasets"]
 	path = datasets
-	url = git@github.com:mmazurekgda/ml-calo-reco-datasets.git
+	url = git@github.com:mmazurekgda/ml-reco-calo-datasets.git
