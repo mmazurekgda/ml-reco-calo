@@ -31,16 +31,18 @@ class CNN(CNNCore):
         )
 
         if not model:
-            self.log.error("Model not specified")
+            self.log.error("-> Model not specified")
         self.model = model(config)
 
         if not dataloader:
-            self.log.error("Dataloader not specified")
+            self.log.error("-> Dataloader not specified")
         self.dataloader = dataloader(config)
         self.val_dataloader = dataloader(config, training=False)
 
         if self.config.load_weight_path:
-            self.model.load_weights(self.config.load_weight_path)
+            paths = self.config.paths_to_global(paths)
+            self.log.debug(f"-> Loading weights from: {paths}")
+            self.model.load_weights(paths)
 
     def transform_dataset(self, x, y):
         return (
@@ -71,6 +73,7 @@ class CNN(CNNCore):
         # Callbacks
         callbacks = []
         if self.config.reduce_lr:
+            self.log.debug("-> Adding ReduceLROnPlateau callback")
             callbacks.append(
                 ReduceLROnPlateau(
                     verbose=self.config.reduce_lr_verbosity,
@@ -79,6 +82,7 @@ class CNN(CNNCore):
                 )
             )
         if self.config.early_stopping:
+            self.log.debug("-> Adding EarlyStopping callback")
             callbacks.append(
                 EarlyStopping(
                     patience=self.config.early_stopping_patience,
@@ -87,9 +91,10 @@ class CNN(CNNCore):
                 )
             )
         if self.config.model_checkpoint:
+            self.log.debug("-> Adding ModelCheckpoint callback")
             callbacks.append(
                 ModelCheckpoint(
-                    self.config.model_checkpoint_out_weight_path,
+                    self.config.model_checkpoint_out_weight_file,
                     verbose=self.config.model_checkpoint_verbosity,
                     save_weights_only=self.config.model_checkpoint_save_weights_only,
                     save_best_only=self.config.model_checkpoint_save_best_only,
@@ -100,19 +105,22 @@ class CNN(CNNCore):
 
         #with tf.distribute.MirroredStrategy().scope():
             #model = eval("model_{}".format(backbone))(training=True)
-        self.log.debug(self.model.summary())
+        self.model.summary(print_fn=lambda x: self.log.debug(x))
 
+        self.log.debug("-> Adding the optimizer.")
         optimizer = tf.keras.optimizers.Adam(
             lr=self.config.learning_rate
         )
 
+        self.log.debug("-> Compiling model...")
         self.model.compile(
             optimizer=optimizer,
             loss=self.loss()
         )
+        self.log.debug("-> Done.")
 
-        # return the history 
-        return self.model.fit(
+        self.log.info("-> Training...")
+        self.model.fit(
             dataset,
             epochs=self.config.epochs,
             validation_data=val_dataset,
@@ -121,4 +129,5 @@ class CNN(CNNCore):
             # validation_steps=self.config.validation_samples,
             callbacks=callbacks,
         )
+        self.log.info("-> Training finished.")
 

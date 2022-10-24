@@ -12,7 +12,7 @@ from cnn.config import Config as CNNConfig
 
 def parse_options(args, parsed_start_time: str) -> CNNConfig:
     # create the working directory
-    directory = args.directory
+    directory = args.output_area
     if not os.path.exists(directory):
         os.makedirs(directory)
     # activate the logger
@@ -24,6 +24,7 @@ def parse_options(args, parsed_start_time: str) -> CNNConfig:
     log.info("Start time: " + parsed_start_time)
     log.debug("Parsing options MCRecoCalo")
     config = CNNConfig(
+        output_area=directory,
         load_config_file=args.config_file,
     )
     for prop, def_value in CNNConfig.OPTIONS.items():
@@ -113,9 +114,9 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
-        '--directory',
+        '--output_area',
         help='directory where to keep files',
-        default=f"./{parsed_start_time}",
+        default=f"./evaluations/{parsed_start_time}",
     )
     # TODO: not yet
     # parser.add_argument(
@@ -158,8 +159,14 @@ if __name__ == "__main__":
         config=config,
     )
 
+    log.debug("Dumping the config file...")
+    config.dump_to_file()
+
     if args.training:
+        log.info("The chosen main action is: TRAINING")
+        log.info("Preparing the training procedure...")
         framework.train()
+        log.info("End of the training procedure.")
     else:
         log.error("No main action selected.")
     end_time = datetime.utcnow()

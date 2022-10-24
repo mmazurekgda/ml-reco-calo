@@ -17,8 +17,10 @@ def dataloader():
         )
 
     def loader(config, training=True):
+        files = config.tfrecords_files if training else config.tfrecords_validation_files
+        files = config.paths_to_global(files)
         dataset = tf.data.TFRecordDataset(
-            config.tfrecords_files if training else config.tfrecords_validation_files,
+            files,
             buffer_size=config.tfrecords_buffer_size,
             num_parallel_reads=config.tfrecords_num_parallel_reads,
             compression_type=config.tfrecords_compression_type, # "GZIP", "ZLIB", or ""
