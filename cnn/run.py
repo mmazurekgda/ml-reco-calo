@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import logging as log
 import argparse
+import signal
 
 from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
@@ -18,8 +19,38 @@ from cnn.config import Config
 from cnn.dataset import Dataset
 from cnn.core import CNNCore
 
+registered_interruptions = 0
+
+class StopTrainingSignal(Exception):
+    pass
+
+class CNNCustomCallback(tf.keras.callbacks.Callback):
+    def __init__(self, logger=None):
+        super().__init__()
+        self.log = logger
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.log.info(f"\n--> Epoch: {epoch}, 'loss': {logs['loss']}, 'val_loss': {logs['val_loss']}")
+
+    def on_batch_end(self, batch, logs=None):
+        global registered_interruptions
+        if registered_interruptions >= 2:
+            self.model.stop_training = True
 
 class CNN(CNNCore):
+
+    def _stop_training_handler(self):
+        def handler(signum, frame):
+            global registered_interruptions
+            registered_interruptions += 1
+            if registered_interruptions == 1:
+                self.log.warning("\nRegistered CTRL+C. Press again to stop the training safely.")
+            elif registered_interruptions== 2:
+                self.log.error("\nRegistered CTRL+C. Safe stopping. Press again to stop the training IMMEDIATELY.")
+            else:
+                self.log.fatal("\nStopping the training immediately!")
+                raise StopTrainingSignal()
+        return handler
 
     def __init__(self,
         model=None,
@@ -71,7 +102,7 @@ class CNN(CNNCore):
         val_dataset = self.parse_dataset(val_dataset)
 
         # Callbacks
-        callbacks = []
+        callbacks = [CNNCustomCallback(logger=self.log)]
         if self.config.reduce_lr:
             self.log.debug("-> Adding ReduceLROnPlateau callback")
             callbacks.append(
@@ -100,6 +131,8 @@ class CNN(CNNCore):
                     save_best_only=self.config.model_checkpoint_save_best_only,
                 ),
             )
+
+
             #TensorBoard(log_dir=Config.tensorboard_dir,
             #            histogram_freq=1, batch_size=Config.batch_size, write_grads=True, write_graph=True)
 
@@ -118,16 +151,20 @@ class CNN(CNNCore):
             loss=self.loss()
         )
         self.log.debug("-> Done.")
-
         self.log.info("-> Training...")
-        self.model.fit(
-            dataset,
-            epochs=self.config.epochs,
-            validation_data=val_dataset,
-            # steps_per_epoch=self.config.samples // self.config.batch_size,
-            # validation_data=vs,
-            # validation_steps=self.config.validation_samples,
-            callbacks=callbacks,
-        )
+        try:
+            signal.signal(signal.SIGINT, self._stop_training_handler())
+            self.model.fit(
+                dataset,
+                epochs=self.config.epochs,
+                validation_data=val_dataset,
+                # steps_per_epoch=self.config.samples // self.config.batch_size,
+                # validation_data=vs,
+                # validation_steps=self.config.validation_samples,
+                callbacks=callbacks,
+            )
+        except StopTrainingSignal:
+            self.log.fatal("Training stopped!")
+
         self.log.info("-> Training finished.")
 
