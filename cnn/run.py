@@ -139,12 +139,21 @@ class CNN(CNNCore):
                     save_best_only=self.config.model_checkpoint_save_best_only,
                 ),
             )
+        if self.config.tensorboard:
+            callbacks.append(
+                tf.keras.callbacks.TensorBoard(
+                    log_dir=self.config.tensorboard_dir,
+                    histogram_freq=self.config.tensorboard_histogram_freq
+                    write_graph=self.config.tensorboard_write_graph,
+                    write_images=self.config.tensorboard_write_images,
+                    write_steps_per_second=self.config.tensorboard_write_steps_per_second,
+                    update_freq=self.config.tensorboard_update_freq,
+                    profile_batch=self.config.tensorboard_profile_batch,
+                    embeddings_freq=self.config.tensorboard_embeddings_freq,
+                    embeddings_metadata=self.config.tensorboard_embeddings_metadata,
+                )
+            )
 
-            # TensorBoard(log_dir=Config.tensorboard_dir,
-            #            histogram_freq=1, batch_size=Config.batch_size, write_grads=True, write_graph=True)
-
-        # with tf.distribute.MirroredStrategy().scope():
-        # model = eval("model_{}".format(backbone))(training=True)
         self.model.summary(print_fn=lambda x: self.log.debug(x))
 
         self.log.debug("-> Adding the optimizer.")

@@ -35,7 +35,17 @@ class Config:
         "model_checkpoint_save_weights_only": True,
         "model_checkpoint_save_best_only": True,
         # tensorboard
-        # tensorboard_dir = '{}/logs'.format(conf_timestamp)
+        "tensorboard": False,
+        "tensorboard_log_dir": "tensorboard",
+        "tensorboard_histogram_freq": 1,
+        "tensorboard_write_graph": True,
+        "tensorboard_write_images": True,
+        "tensorboard_write_steps_per_second": False,
+        "tensorboard_update_freq": "epoch",
+        "tensorboard_profile_batch": 0,
+        "tensorboard_embeddings_freq": 1,
+        "tensorboard_embeddings_metadata": None,
+        # other
         "load_weight_path": None,
     }
 
