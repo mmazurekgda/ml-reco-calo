@@ -5,77 +5,83 @@ import logging
 import git
 import copy
 
+
 class Config:
 
     TRAINING_OPTIONS = {
-        'learning_rate': 1e-4,
-        'epochs': 30,
-        'batch_size': 1,
+        "learning_rate": 1e-4,
+        "epochs": 30,
+        "batch_size": 1,
         # 'samples': 100,
         # 'validation_samples': 100,
         # 'validation_split': .2,
-        'iou_ignore': .5,
-        'dataset_cache': False,
+        "iou_ignore": 0.5,
+        "dataset_cache": False,
         # 'shuffle_buffer_size': = 1000  # None = do not shuffle
         # early stopping
-        'early_stopping': True,
-        'early_stopping_patience': 6,
-        'early_stopping_verbosity': 1,
-        'early_stopping_restore': True,
-        # reduce lr 
-        'reduce_lr': True,
-        'reduce_lr_verbosity': 1,
-        'reduce_lr_patience': 5,
-        'reduce_lr_cooldown': 5,
+        "early_stopping": True,
+        "early_stopping_patience": 6,
+        "early_stopping_verbosity": 1,
+        "early_stopping_restore": True,
+        # reduce lr
+        "reduce_lr": True,
+        "reduce_lr_verbosity": 1,
+        "reduce_lr_patience": 5,
+        "reduce_lr_cooldown": 5,
         # model checkpoint
-        'model_checkpoint': True,
-        'model_checkpoint_verbosity': 1,
-        'model_checkpoint_out_weight_file': 'weights.tf',
-        'model_checkpoint_save_weights_only': True,
-        'model_checkpoint_save_best_only': True,
+        "model_checkpoint": True,
+        "model_checkpoint_verbosity": 1,
+        "model_checkpoint_out_weight_file": "weights.tf",
+        "model_checkpoint_save_weights_only": True,
+        "model_checkpoint_save_best_only": True,
         # tensorboard
         # tensorboard_dir = '{}/logs'.format(conf_timestamp)
-        'load_weight_path': None,
-
+        "load_weight_path": None,
     }
 
     TFRECORDS_DATALOADER = {
-        'tfrecords_files': '',
-        'tfrecords_validation_files': '',
-        'tfrecords_buffer_size': None,
-        'tfrecords_num_parallel_reads': os.cpu_count(),
-        'tfrecords_compression_type': 'ZLIB',
+        "tfrecords_files": "",
+        "tfrecords_validation_files": "",
+        "tfrecords_buffer_size": None,
+        "tfrecords_num_parallel_reads": os.cpu_count(),
+        "tfrecords_compression_type": "ZLIB",
     }
 
     INFERENCE_OPTIONS = {
-        'max_boxes': 1500,
-        'classes': ['one'],
-        'iou_threshold': .5,
-        'score_threshold': .5,
-        'soft_nms_sigma': .5,
+        "max_boxes": 1500,
+        "classes": ["one"],
+        "iou_threshold": 0.5,
+        "score_threshold": 0.5,
+        "soft_nms_sigma": 0.5,
     }
 
     DATA_OPTIONS = {
-        'img_width': 384,
-        'img_height': 312,
-        'target_img_width': 384,
-        'target_img_height': 312,
-        'channels': 1,
-        'energy_cols_no': 1,
+        "img_width": 384,
+        "img_height": 312,
+        "target_img_width": 384,
+        "target_img_height": 312,
+        "channels": 1,
+        "energy_cols_no": 1,
     }
 
     CNN_OPTIONS = {
-        'anchors_not_parsed': np.array([
-            (6, 6),
-            (9, 9),
-            (18, 18),
-        ], np.float32),
-        'anchor_masks': np.array([
-            (6, 6),
-            (9, 9),
-            (18, 18),
-        ], np.float32),
-        'granularities': [
+        "anchors_not_parsed": np.array(
+            [
+                (6, 6),
+                (9, 9),
+                (18, 18),
+            ],
+            np.float32,
+        ),
+        "anchor_masks": np.array(
+            [
+                (6, 6),
+                (9, 9),
+                (18, 18),
+            ],
+            np.float32,
+        ),
+        "granularities": [
             (8, 8),
             (4, 4),
             (2, 2),
@@ -91,9 +97,9 @@ class Config:
     }
 
     NON_CONFIGURABLE_OPTIONS = {
-        'anchors': np.ndarray([]),
-        'classes_no': 0,
-        'features_no': 0,
+        "anchors": np.ndarray([]),
+        "classes_no": 0,
+        "features_no": 0,
     }
 
     OPTIONS = {
@@ -105,42 +111,42 @@ class Config:
     _rigid = False
 
     _options_with_dirs = [
-        'tfrecords_files',
-        'tfrecords_validation_files',
-        'load_weight_path',
+        "tfrecords_files",
+        "tfrecords_validation_files",
+        "load_weight_path",
     ]
 
     _output_area_dirs = [
-        'model_checkpoint_out_weight_file',
+        "model_checkpoint_out_weight_file",
     ]
 
     def __setattr__(self, key, value):
-        new_value = copy.copy(value) # FIXME: needed? or too paranoid
-        if self._frozen and key != '_frozen':
+        new_value = copy.copy(value)  # FIXME: needed? or too paranoid
+        if self._frozen and key != "_frozen":
             msg = f"Config became a frozen class. No futher changes possible. Tried setting '{key}': '{value}'"
-            if hasattr(self, 'log'):
+            if hasattr(self, "log"):
                 self.log.error(msg)
             raise TypeError(msg)
         if self._rigid and not hasattr(self, key):
             msg = f"Config became a rigid class. No additional options possible. Tried setting '{key}': '{value}'"
-            if hasattr(self, 'log'):
+            if hasattr(self, "log"):
                 self.log.error(msg)
             raise TypeError(msg)
         if key in self.OPTIONS:
             if key in self._output_area_dirs and new_value:
-                new_value = '/'.join([self.output_area, new_value])
+                new_value = "/".join([self.output_area, new_value])
             if key in self._options_with_dirs and new_value:
                 new_value = self.change_to_local_paths(key, value)
-            override_text = 'DEFAULT'
+            override_text = "DEFAULT"
             if self._rigid:
-                override_text = 'NEW VALUE'
+                override_text = "NEW VALUE"
                 if not self._safe_JSON(new_value):
                     self.log.warning(f"--> Setting an undefined property for {key}")
             self.log.debug(f"--> ({override_text}) '{key}': {new_value}")
         object.__setattr__(self, key, new_value)
 
     def __init__(self, output_area="./", load_config_file=None, freeze=False):
-        self.log = logging.getLogger('MCRecoCalo')
+        self.log = logging.getLogger("MCRecoCalo")
         self.log.info(f"Initialized a new config.")
         self._set_working_area()
         self._set_output_area(output_area)
@@ -167,10 +173,15 @@ class Config:
             self._freeze()
 
     def _set_working_area(self):
-        repo = git.Repo('.', search_parent_directories=True)
-        if repo.remotes.origin.url.split('.git')[0].split('/')[-1] == 'ml-reco-calo-datasets':
-            repo = git.Repo(repo.working_tree_dir +  '/..', search_parent_directories=True)
-        if repo.remotes.origin.url.split('.git')[0].split('/')[-1] != 'ml-reco-calo':
+        repo = git.Repo(".", search_parent_directories=True)
+        if (
+            repo.remotes.origin.url.split(".git")[0].split("/")[-1]
+            == "ml-reco-calo-datasets"
+        ):
+            repo = git.Repo(
+                repo.working_tree_dir + "/..", search_parent_directories=True
+            )
+        if repo.remotes.origin.url.split(".git")[0].split("/")[-1] != "ml-reco-calo":
             msg = "Invalid working area. Must be inside MLRecoCalo repository."
             log.error(msg)
             raise ValueError(msg)
@@ -188,7 +199,7 @@ class Config:
     def change_to_local_paths(self, option, paths):
         if type(paths) is str:
             return self.ensure_local_path(option, paths)
-        elif hasattr(paths, '__iter__'):
+        elif hasattr(paths, "__iter__"):
             new_paths = []
             for path in paths:
                 new_paths.append(self.ensure_local_path(option, path))
@@ -209,9 +220,9 @@ class Config:
                 msg = f"-> The '{option}' has an invalid path. Must contain the working area: '{self.working_area}'"
                 self.log.error(msg)
                 raise FileNotFoundError(msg)
-            return path.replace(self.working_area + '/', '')
+            return path.replace(self.working_area + "/", "")
         else:
-            if not os.path.isfile('/'.join([self.working_area, path])):
+            if not os.path.isfile("/".join([self.working_area, path])):
                 msg = f"-> The '{option}' has an invalid path. Must be with respect to the working area: '{self.working_area}'"
                 self.log.error(msg)
                 raise FileNotFoundError(msg)
@@ -220,11 +231,11 @@ class Config:
     def paths_to_global(self, paths):
         directory = self.working_area
         if type(paths) is str:
-            return '/'.join([directory, paths])
-        if hasattr(paths, '__iter__'):
+            return "/".join([directory, paths])
+        if hasattr(paths, "__iter__"):
             new_paths = []
             for path in paths:
-                new_path.append('/'.join([directory, path]))
+                new_path.append("/".join([directory, path]))
             return new_paths
 
     def _rigidify(self):
@@ -249,17 +260,19 @@ class Config:
         return value
 
     def _safe_object(self, key, value):
-        if key in ['anchors_not_parsed', 'anchors_masks', 'anchors']:
+        if key in ["anchors_not_parsed", "anchors_masks", "anchors"]:
             return np.array(value)
         return value
 
     def to_JSON(self):
-        options_copy = { key: self._safe_JSON(getattr(self, key)) for key in self.OPTIONS }
+        options_copy = {
+            key: self._safe_JSON(getattr(self, key)) for key in self.OPTIONS
+        }
         return json.dumps(options_copy, sort_keys=True, indent=4)
 
     def dump_to_file(self, config_file="config.json"):
-        config_path = '/'.join([self.output_area, config_file])
-        with open(config_path, 'w') as json_dump:
+        config_path = "/".join([self.output_area, config_file])
+        with open(config_path, "w") as json_dump:
             json.dump(self.to_JSON(), json_dump)
         self.log.debug(f"-> Config dumped to '{config_path}'")
 
@@ -272,7 +285,6 @@ class Config:
             setattr(self, option, value)
         if was_frozen:
             self._freeze()
-
 
     # FIXME: workaround for methods defined in core
     def refine_boxes(self, pred, anchors):

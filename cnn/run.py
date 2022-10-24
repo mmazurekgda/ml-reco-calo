@@ -1,5 +1,6 @@
 import numpy as np
-#from tabulate import tabulate
+
+# from tabulate import tabulate
 import tensorflow as tf
 import time
 import pandas as pd
@@ -11,7 +12,7 @@ from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
     EarlyStopping,
     ModelCheckpoint,
-    TensorBoard
+    TensorBoard,
 )
 
 # local
@@ -21,8 +22,10 @@ from cnn.core import CNNCore
 
 registered_interruptions = 0
 
+
 class StopTrainingSignal(Exception):
     pass
+
 
 class CNNCustomCallback(tf.keras.callbacks.Callback):
     def __init__(self, logger=None):
@@ -30,29 +33,37 @@ class CNNCustomCallback(tf.keras.callbacks.Callback):
         self.log = logger
 
     def on_epoch_end(self, epoch, logs=None):
-        self.log.info(f"\n--> Epoch: {epoch}, 'loss': {logs['loss']}, 'val_loss': {logs['val_loss']}")
+        self.log.info(
+            f"\n--> Epoch: {epoch}, 'loss': {logs['loss']}, 'val_loss': {logs['val_loss']}"
+        )
 
     def on_batch_end(self, batch, logs=None):
         global registered_interruptions
         if registered_interruptions >= 2:
             self.model.stop_training = True
 
-class CNN(CNNCore):
 
+class CNN(CNNCore):
     def _stop_training_handler(self):
         def handler(signum, frame):
             global registered_interruptions
             registered_interruptions += 1
             if registered_interruptions == 1:
-                self.log.warning("\nRegistered CTRL+C. Press again to stop the training safely.")
-            elif registered_interruptions== 2:
-                self.log.error("\nRegistered CTRL+C. Safe stopping. Press again to stop the training IMMEDIATELY.")
+                self.log.warning(
+                    "\nRegistered CTRL+C. Press again to stop the training safely."
+                )
+            elif registered_interruptions == 2:
+                self.log.error(
+                    "\nRegistered CTRL+C. Safe stopping. Press again to stop the training IMMEDIATELY."
+                )
             else:
                 self.log.fatal("\nStopping the training immediately!")
                 raise StopTrainingSignal()
+
         return handler
 
-    def __init__(self,
+    def __init__(
+        self,
         model=None,
         dataloader=None,
         config=None,
@@ -76,10 +87,7 @@ class CNN(CNNCore):
             self.model.load_weights(paths)
 
     def transform_dataset(self, x, y):
-        return (
-            self.transform_images(x),
-            self.transform_targets(y)
-        )
+        return (self.transform_images(x), self.transform_targets(y))
 
     def parse_dataset(self, dataset):
         dataset = dataset.prefetch(
@@ -132,24 +140,18 @@ class CNN(CNNCore):
                 ),
             )
 
-
-            #TensorBoard(log_dir=Config.tensorboard_dir,
+            # TensorBoard(log_dir=Config.tensorboard_dir,
             #            histogram_freq=1, batch_size=Config.batch_size, write_grads=True, write_graph=True)
 
-        #with tf.distribute.MirroredStrategy().scope():
-            #model = eval("model_{}".format(backbone))(training=True)
+        # with tf.distribute.MirroredStrategy().scope():
+        # model = eval("model_{}".format(backbone))(training=True)
         self.model.summary(print_fn=lambda x: self.log.debug(x))
 
         self.log.debug("-> Adding the optimizer.")
-        optimizer = tf.keras.optimizers.Adam(
-            lr=self.config.learning_rate
-        )
+        optimizer = tf.keras.optimizers.Adam(lr=self.config.learning_rate)
 
         self.log.debug("-> Compiling model...")
-        self.model.compile(
-            optimizer=optimizer,
-            loss=self.loss()
-        )
+        self.model.compile(optimizer=optimizer, loss=self.loss())
         self.log.debug("-> Done.")
         self.log.info("-> Training...")
         try:
@@ -167,4 +169,3 @@ class CNN(CNNCore):
             self.log.fatal("Training stopped!")
 
         self.log.info("-> Training finished.")
-

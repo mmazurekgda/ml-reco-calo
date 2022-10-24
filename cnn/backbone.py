@@ -1,19 +1,34 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv2D, LeakyReLU, ZeroPadding2D, Add, UpSampling2D, Concatenate, MaxPool2D, BatchNormalization
+from tensorflow.keras.layers import (
+    Input,
+    Conv2D,
+    LeakyReLU,
+    ZeroPadding2D,
+    Add,
+    UpSampling2D,
+    Concatenate,
+    MaxPool2D,
+    BatchNormalization,
+)
 from tensorflow.keras import Model
 from tensorflow.keras.regularizers import l2
 
 
 def DarknetConv(x, filters, size, strides=1, batch_norm=True):
     if strides == 1:
-        padding = 'same'
+        padding = "same"
     else:
         x = ZeroPadding2D(((1, 0), (1, 0)))(x)  # top left half-padding
-        padding = 'valid'
+        padding = "valid"
 
-    x = Conv2D(filters=filters, kernel_size=size,
-               strides=strides, padding=padding,
-               use_bias=not batch_norm, kernel_regularizer=l2(0.0005))(x)
+    x = Conv2D(
+        filters=filters,
+        kernel_size=size,
+        strides=strides,
+        padding=padding,
+        use_bias=not batch_norm,
+        kernel_regularizer=l2(0.0005),
+    )(x)
     if batch_norm:
         x = BatchNormalization()(x)
         x = LeakyReLU(alpha=0.1)(x)
@@ -49,36 +64,35 @@ def Darknet(channels, name=None):
 def DarknetTiny(channels, name=None):
     x = inputs = Input([None, None, channels])
     x = DarknetConv(x, 16, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 32, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 64, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 128, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = x_8 = DarknetConv(x, 256, 3)  # skip connection
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 512, 3)
-    x = MaxPool2D(2, 1, 'same')(x)
+    x = MaxPool2D(2, 1, "same")(x)
     x = DarknetConv(x, 1024, 3)
     return tf.keras.Model(inputs, (x, x_8), name=name)
-
 
 
 def DarknetTiny(channels, name=None):
     x = inputs = Input([None, None, channels])
     x = DarknetConv(x, 16, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 32, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 64, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 128, 3)
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = x_8 = DarknetConv(x, 256, 3)  # skip connection
-    x = MaxPool2D(2, 2, 'same')(x)
+    x = MaxPool2D(2, 2, "same")(x)
     x = DarknetConv(x, 512, 3)
-    x = MaxPool2D(2, 1, 'same')(x)
+    x = MaxPool2D(2, 1, "same")(x)
     x = DarknetConv(x, 1024, 3)
     return tf.keras.Model(inputs, (x, x_8), name=name)
 
@@ -121,4 +135,5 @@ def YoloConvTiny(filters, name=None):
             x = DarknetConv(x, filters, 1)
 
         return Model(inputs, x, name=name)(x_in)
+
     return yolo_conv
