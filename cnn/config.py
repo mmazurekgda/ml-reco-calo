@@ -54,7 +54,7 @@ class Config:
         "tfrecords_files": "",
         "tfrecords_validation_files": "",
         "tfrecords_buffer_size": None,
-        "tfrecords_num_parallel_reads": os.cpu_count(),
+        # "tfrecords_num_parallel_reads": os.cpu_count(),
         "tfrecords_compression_type": "ZLIB",
     }
 

@@ -31,7 +31,7 @@ def dataloader():
         dataset = tf.data.TFRecordDataset(
             files,
             buffer_size=config.tfrecords_buffer_size,
-            num_parallel_reads=config.tfrecords_num_parallel_reads,
+            num_parallel_reads=os.cpu_count(),
             compression_type=config.tfrecords_compression_type,  # "GZIP", "ZLIB", or ""
         ).map(lambda x: decode(x, config))
         return dataset
