@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 export SCRATCH_DIR=/scratch/$PBS_JOBID
 export CONDA_DIR=$SCRATCH_DIR/miniconda32
 export MLRECOCALO_REPO_DIR=$HOME/ml-reco-calo-sync
@@ -34,26 +35,15 @@ else
     echo "-> Done!"
 fi
 
-export OUTPUT_AREA=$MLRECOCALO_REPO_DIR/evaluations/$(python -c "from datetime import datetime; print(datetime.utcnow().strftime(\"%Y%m%d_%H%M%S%f\"))")
-mkdir -p $OUTPUT_AREA
-
-# echo "Loading bashrc"
-# 
-#echo "Activating conda environment"
-#conda activate calo_nn
-#module load gcc/9.3.0
-
-
-# REPO_DIR=${HOME}/ml-reco-calo-sync
-# cd ${REPO_DIR}
-
-#CONFIG=$(cat config.py)
-#BACKBONE=$(cat calo_yolo/backbone.py)
-#CALOYOLO=$(cat calo_yolo/calo_yolo.py)
-
+# OPTIONS:
 MODEL_NAME=custom_32x32
 CONFIG_FILE=datasets/toy/GaussinoCaloShowers__phase1_inner__18x18s36x36__64x64_1GeV__gamma__base/config.json
+
+export PROGRAM_BEGIN=$(python -c "from datetime import datetime; print(datetime.utcnow().strftime(\"%Y%m%d_%H%M%S%f\"))")
+export OUTPUT_AREA=$MLRECOCALO_REPO_DIR/evaluations/$PROGRAM_BEGIN
+mkdir -p $OUTPUT_AREA
 export CONFIG_FILE_PATH=$MLRECOCALO_REPO_DIR/$CONFIG_FILE
+export OUTPUT_CONFIG_FILE_PATH=$OUTPUT_AREA/config.json
 
 sendmail "michal.mazurek@cern.ch" <<EOF
 subject:CIS CLUSTER: STARTED $PBS_JOBID on $HOSTNAME
@@ -61,8 +51,7 @@ subject:CIS CLUSTER: STARTED $PBS_JOBID on $HOSTNAME
 REPO $MLRECOCALO_REPO_DIR
 HOST $HOSTNAME
 OUTPUTAREA $OUTPUT_AREA
-Job params:
-
+Loaded options:
 $(python -c "import os; import json; config_file =  open(os.getenv(\"CONFIG_FILE_PATH\")); data = json.load(config_file); print('\n'.join([ ':'.join([prop, str(value)]) for prop, value in json.loads(data).items()]))")
 
 EOF
@@ -79,7 +68,8 @@ python run.py \
 2>&1 | tee ${OUTPUT_AREA}/stdout
 
 
-sendmail "mmazurekgda@gmail.com" <<EOF
+sendmail "michal.mazurek@cern.ch" <<EOF
 subject:CIS CLUSTER: FINISHED $PBS_JOBID on $HOSTNAME
+$(python -c "import os; import json; config_file =  open(os.getenv(\"OUTPUT_CONFIG_FILE_PATH\")); data = json.load(config_file); print('\n'.join([ ':'.join([prop, str(value)]) for prop, value in json.loads(data).items()]))")
 EOF
 
