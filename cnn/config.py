@@ -12,11 +12,11 @@ class Config:
         "learning_rate": 1e-4,
         "epochs": 30,
         "batch_size": 1,
-        # 'samples': 100,
-        # 'validation_samples': 100,
+        'samples': -1,
+        'validation_samples': -1,
         # 'validation_split': .2,
         "iou_ignore": 0.5,
-        "dataset_cache": True,
+        "dataset_cache": False,
         # 'shuffle_buffer_size': = 1000  # None = do not shuffle
         # early stopping
         "early_stopping": True,
@@ -40,7 +40,8 @@ class Config:
         "tensorboard_histogram_freq": 1,
         "tensorboard_write_graph": True,
         "tensorboard_write_images": True,
-        "tensorboard_write_steps_per_second": False,
+        # "tensorboard_write_steps_per_second": False,
+        # -> not available in TF 2.0
         "tensorboard_update_freq": "epoch",
         "tensorboard_profile_batch": 0,
         "tensorboard_embeddings_freq": 1,
@@ -128,6 +129,7 @@ class Config:
 
     _output_area_dirs = [
         "model_checkpoint_out_weight_file",
+        "tensorboard_log_dir",
     ]
 
     def __setattr__(self, key, value):
@@ -222,7 +224,7 @@ class Config:
     def ensure_local_path(self, option, path):
         local_path = ""
         if os.path.isabs(path):
-            if not os.path.isfile(path):
+            if not os.path.exists(path):
                 msg = f"-> The '{option}' has an invalid path. The file '{path}' does not exist."
                 self.log.error(msg)
                 raise FileNotFoundError(msg)
@@ -232,7 +234,7 @@ class Config:
                 raise FileNotFoundError(msg)
             return path.replace(self.working_area + "/", "")
         else:
-            if not os.path.isfile("/".join([self.working_area, path])):
+            if not os.path.exists("/".join([self.working_area, path])):
                 msg = f"-> The '{option}' has an invalid path. Must be with respect to the working area: '{self.working_area}'"
                 self.log.error(msg)
                 raise FileNotFoundError(msg)

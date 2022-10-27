@@ -3,7 +3,6 @@ import numpy as np
 # from tabulate import tabulate
 import tensorflow as tf
 import time
-import pandas as pd
 import logging as log
 import argparse
 import signal
@@ -33,8 +32,10 @@ class CNNCustomCallback(tf.keras.callbacks.Callback):
         self.log = logger
 
     def on_epoch_end(self, epoch, logs=None):
+        loss = logs.get('loss', 'UNKNOWN')
+        val_loss = logs.get('val_loss', 'UNKNOWN')
         self.log.info(
-            f"\n--> Epoch: {epoch}, 'loss': {logs['loss']}, 'val_loss': {logs['val_loss']}"
+            f"\n--> Epoch: {epoch}, 'loss': {loss}, 'val_loss': {val_loss}"
         )
 
     def on_batch_end(self, batch, logs=None):
@@ -74,41 +75,40 @@ class CNN(CNNCore):
 
         if not model:
             self.log.error("-> Model not specified")
-        self.model = model(config)
+        self.model = model#(config)
 
         if not dataloader:
             self.log.error("-> Dataloader not specified")
         self.dataloader = dataloader(config)
         self.val_dataloader = dataloader(config, training=False)
 
-        if self.config.load_weight_path:
-            paths = self.config.paths_to_global(paths)
-            self.log.debug(f"-> Loading weights from: {paths}")
-            self.model.load_weights(paths)
+        # Load data
+        dataset = self.dataloader
+        self.dataset = self.parse_dataset(dataset)
+        val_dataset = self.val_dataloader
+        self.val_dataset = self.parse_dataset(val_dataset)
 
     def transform_dataset(self, x, y):
         return (self.transform_images(x), self.transform_targets(y))
 
     def parse_dataset(self, dataset):
-        dataset = dataset.prefetch(
-            buffer_size=tf.data.experimental.AUTOTUNE,
-        )
         dataset = dataset.map(
             self.transform_dataset,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-        dataset = dataset.batch(self.config.batch_size)
+        dataset = dataset.batch(self.config.batch_size, drop_remainder=True)
+        dataset = dataset.prefetch(
+            buffer_size=tf.data.experimental.AUTOTUNE,
+        )
         if self.config.dataset_cache:
             dataset = dataset.cache()
+        # if self.config.shuffle:
+        #    dataset = dataset.shuffle()
+        dataset = dataset.repeat()
         return dataset
 
-    def train(self):
-        # Load data
-        dataset = self.dataloader
-        dataset = self.parse_dataset(dataset)
-        val_dataset = self.val_dataloader
-        val_dataset = self.parse_dataset(val_dataset)
-
+    def train(self, no_devices=1):
+        self.log.info("-> Preparing the training procedure...")
         # Callbacks
         callbacks = [CNNCustomCallback(logger=self.log)]
         if self.config.reduce_lr:
@@ -142,17 +142,25 @@ class CNN(CNNCore):
         if self.config.tensorboard:
             callbacks.append(
                 tf.keras.callbacks.TensorBoard(
-                    log_dir=self.config.tensorboard_dir,
-                    histogram_freq=self.config.tensorboard_histogram_freq
+                    log_dir=self.config.tensorboard_log_dir,
+                    histogram_freq=self.config.tensorboard_histogram_freq,
                     write_graph=self.config.tensorboard_write_graph,
                     write_images=self.config.tensorboard_write_images,
-                    write_steps_per_second=self.config.tensorboard_write_steps_per_second,
+                    # incompatible with TF 2.0
+                    # write_steps_per_second=self.config.tensorboard_write_steps_per_second,
                     update_freq=self.config.tensorboard_update_freq,
                     profile_batch=self.config.tensorboard_profile_batch,
                     embeddings_freq=self.config.tensorboard_embeddings_freq,
                     embeddings_metadata=self.config.tensorboard_embeddings_metadata,
                 )
             )
+
+        self.model = self.model(self.config)
+
+        if self.config.load_weight_path:
+            paths = self.config.paths_to_global(paths)
+            self.log.debug(f"-> Loading weights from: {paths}")
+            self.model.load_weights(paths)
 
         self.model.summary(print_fn=lambda x: self.log.debug(x))
 
@@ -166,15 +174,18 @@ class CNN(CNNCore):
         try:
             signal.signal(signal.SIGINT, self._stop_training_handler())
             self.model.fit(
-                dataset,
+                self.dataset,
                 epochs=self.config.epochs,
-                validation_data=val_dataset,
-                # steps_per_epoch=self.config.samples // self.config.batch_size,
+                validation_data=self.val_dataset,
+                # TF 2.0: needed to avoid errors at the end of loop
+                steps_per_epoch=self.samples // self.config.batch_size // no_devices,
                 # validation_data=vs,
-                # validation_steps=self.config.validation_samples,
+                # TF 2.0: needed to avoid errors at the end of loop
+                validation_steps=self.validation_samples // self.config.batch_size // no_devices,
                 callbacks=callbacks,
             )
         except StopTrainingSignal:
             self.log.fatal("Training stopped!")
 
         self.log.info("-> Training finished.")
+        self.log.info("-> End of the training procedure.")

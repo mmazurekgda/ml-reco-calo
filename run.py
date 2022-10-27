@@ -36,6 +36,11 @@ def parse_options(args, parsed_start_time: str) -> CNNConfig:
             if parsed_value:
                 overriden_text = "(MANUALLY OVERRIDEN)"
                 value = parsed_value
+                # FIXME: this looks tedious
+                if value == 'True':
+                    value = True
+                if value == 'False':
+                    value = False
         if overriden_text or not args.config_file:
             log.debug(f"-> {prop}: {value} {overriden_text}")
             setattr(config, prop, value)
@@ -135,12 +140,22 @@ if __name__ == "__main__":
         default="INFO",
         choices=["INFO", "DEBUG"],
     )
+    parser.add_argument(
+        "--mirrored_strategy",
+        help="training in mirrored strategy",
+        action="store_true",
+    )
 
     # optional, provide support for config options
     for name, value in CNNConfig.OPTIONS.items():
         prop_type = type(value)
-        if prop_type in [int, str, bool, list, float]:
+        if prop_type in [int, str, list, float]:
             parser.add_argument(f"--{name}", type=prop_type)
+        elif prop_type is bool:
+            parser.add_argument(f"--{name}", type=str, choices=['True', 'False'])
+            # parser.add_argument(f'--{name}', action='store_true')
+            # parser.add_argument(f'--no-{name}', dest=name, action='store_false')
+            # parser.set_defaults(feature=True)
 
     args = parser.parse_args()
     config = parse_options(args, parsed_start_time)
@@ -155,9 +170,8 @@ if __name__ == "__main__":
     log.info("Moving to the main part.")
     config._freeze()
 
-    from cnn.run import CNN
-
     log.info("Instantiating the framework...")
+    from cnn.run import CNN
     framework = CNN(
         dataloader=dataloader(),
         model=model(),
@@ -169,9 +183,13 @@ if __name__ == "__main__":
 
     if args.training:
         log.info("The chosen main action is: TRAINING")
-        log.info("Preparing the training procedure...")
-        framework.train()
-        log.info("End of the training procedure.")
+        if args.mirrored_strategy:
+            import tensorflow as tf # FIXME: import here, but already added before
+            with tf.distribute.MirroredStrategy().scope():
+                no_gpus = len(tf.config.experimental.list_physical_devices('GPU'))
+                framework.train(no_devices=no_gpus)
+        else:
+            framework.train()
     else:
         log.error("No main action selected.")
     end_time = datetime.utcnow()
