@@ -1,5 +1,5 @@
 from matplotlib import pyplot as plt
-from utils import x_cell_to_pos, y_cell_to_pos
+from cnn.utils import x_cell_to_pos, y_cell_to_pos
 
 
 def plot_shapes(ax, df, cluster_type="", **kwargs):
