@@ -54,6 +54,7 @@ class Config:
     TFRECORDS_DATALOADER = {
         "tfrecords_files": "",
         "tfrecords_validation_files": "",
+        "tfrecords_test_files": "",
         "tfrecords_buffer_size": None,
         # "tfrecords_num_parallel_reads": os.cpu_count(),
         "tfrecords_compression_type": "ZLIB",
@@ -65,6 +66,20 @@ class Config:
         "iou_threshold": 0.5,
         "score_threshold": 0.5,
         "soft_nms_sigma": 0.5,
+    }
+
+    TEST_OPTIONS = {
+        # needed for the position converter,
+        "img_x_max": -1,
+        "img_x_min": -1,
+        "img_y_max": -1,
+        "img_y_min": -1,
+        # needed for the energy converter,
+        "convert_energy": "normalize", # or standardize
+        "std_particle_energy": -1,
+        "mean_particle_energy": -1,
+        "max_particle_energy": -1,
+        "min_particle_energy": -1,
     }
 
     DATA_OPTIONS = {
@@ -104,6 +119,7 @@ class Config:
         **TRAINING_OPTIONS,
         **TFRECORDS_DATALOADER,
         **INFERENCE_OPTIONS,
+        **TEST_OPTIONS,
         **DATA_OPTIONS,
         **CNN_OPTIONS,
     }
@@ -298,6 +314,26 @@ class Config:
             setattr(self, option, value)
         if was_frozen:
             self._freeze()
+
+    def check_compatibility(self):
+        if not self.convert_energy in ['normalize', 'standardize']:
+            msg = "You can either normalize or standardize energies"
+            self.log.error(msg)
+            raise ValueError(msg)
+
+    def convert_to_energy(self, energy):
+        if self.convert_energy == "standardize":
+            return energy * self.std_particle_energy + self.mean_particle_energy
+        if self.convert_energy == "normalize":
+            return energy * (self.max_particle_energy - self.min_particle_energy) + self.min_particle_energy
+        raise NotImplementedError()
+
+    def convert_to_position(self, position, dim='x'):
+        if dim == "x":
+            return position * (self.img_x_max - self.img_x_min) + self.img_x_min
+        if dim == "y":
+            return position * (self.img_y_max - self.img_y_min) + self.img_y_min
+        raise NotImplementedError()
 
     # FIXME: workaround for methods defined in core
     def refine_boxes(self, pred, anchors):
