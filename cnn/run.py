@@ -104,7 +104,8 @@ class CNN(CNNCore):
             dataset = dataset.cache()
         # if self.config.shuffle:
         #    dataset = dataset.shuffle()
-        dataset = dataset.repeat()
+        if self.config.dataset_repeat:
+            dataset = dataset.repeat()
         return dataset
 
     def train(self, no_devices=1):

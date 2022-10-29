@@ -17,6 +17,7 @@ class Config:
         # 'validation_split': .2,
         "iou_ignore": 0.5,
         "dataset_cache": False,
+        "dataset_repeat": True,
         # 'shuffle_buffer_size': = 1000  # None = do not shuffle
         # early stopping
         "early_stopping": True,
