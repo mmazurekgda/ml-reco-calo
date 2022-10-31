@@ -23,10 +23,12 @@ def dataloader():
             ),
         )
 
-    def loader(config, training=True):
-        files = (
-            config.tfrecords_files if training else config.tfrecords_validation_files
-        )
+    def loader(config, stage="training"):
+        files = config.tfrecords_files
+        if stage == "valdiation":
+            files = config.tfrecords_validation_files
+        elif stage == "testing":
+            files = config.tfrecords_test_files
         files = config.paths_to_global(files)
         dataset = tf.data.TFRecordDataset(
             files,

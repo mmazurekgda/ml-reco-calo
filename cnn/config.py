@@ -14,6 +14,7 @@ class Config:
         "batch_size": 1,
         'samples': -1,
         'validation_samples': -1,
+        'test_samples': -1,
         # 'validation_split': .2,
         "iou_ignore": 0.5,
         "dataset_cache": False,
@@ -64,11 +65,66 @@ class Config:
         "max_boxes": 1500,
         "classes": ["one"],
         "iou_threshold": 0.5,
-        "score_threshold": 0.5,
-        "soft_nms_sigma": 0.5,
+        # the two below should investigated during validation
+        "score_threshold": float('-inf'),
+        # the two below should investigated during validation
+        "soft_nms_sigma": 0.,
     }
 
     TEST_OPTIONS = {
+        "testing": True,
+        "on_epoch_samples": -1,
+        # histograms
+        "on_epoch_histogram_buckets": 100,
+        "on_epoch_histogram_writer_name": "clusterization",
+        "on_epoch_histogram_true_energy_name": "Approx. True Particle Energy",
+        "on_epoch_histogram_true_energy_group": "Approx. Energy",
+        "on_epoch_histogram_true_energy_description": "",
+        "on_epoch_histogram_pred_energy_name": "Approx. Predicted Particle Energy",
+        "on_epoch_histogram_pred_energy_group": "Approx. Energy",
+        "on_epoch_histogram_pred_energy_description": "",
+        "on_epoch_histogram_true_width_name": "Appprox. True Cluster Width",
+        "on_epoch_histogram_true_width_group": "Approx. Cluster Width",
+        "on_epoch_histogram_true_width_description": "",
+        "on_epoch_histogram_pred_width_name": "Approx. Predicted Cluster Width",
+        "on_epoch_histogram_pred_width_group": "Approx. Cluster Width",
+        "on_epoch_histogram_pred_width_description": "",
+        "on_epoch_histogram_true_height_name": "Approx. True Cluster Height",
+        "on_epoch_histogram_true_height_group": "Approx. Cluster Height",
+        "on_epoch_histogram_true_height_description": "",
+        "on_epoch_histogram_pred_height_name": "Approx. Predicted Cluster Height",
+        "on_epoch_histogram_pred_height_group": "Approx. Cluster Height",
+        "on_epoch_histogram_pred_height_description": "",
+        "on_epoch_histogram_true_x_pos_name": "Approx. True Cluster X Position",
+        "on_epoch_histogram_true_x_pos_group": "Approx. Cluster X Position",
+        "on_epoch_histogram_true_x_pos_description": "",
+        "on_epoch_histogram_pred_x_pos_name": "Approx. Predicted Cluster X Position",
+        "on_epoch_histogram_pred_x_pos_group": "Approx. Cluster X Position",
+        "on_epoch_histogram_pred_x_pos_description": "",
+        "on_epoch_histogram_true_y_pos_name": "Approx. True Cluster Y Position",
+        "on_epoch_histogram_true_y_pos_group": "Approx. Cluster Y Position",
+        "on_epoch_histogram_true_y_pos_description": "",
+        "on_epoch_histogram_pred_y_pos_name": "Approx. Predicted Cluster Y Position",
+        "on_epoch_histogram_pred_y_pos_group": "Approx. Cluster Y Position",
+        "on_epoch_histogram_pred_y_pos_description": "",
+        # labels
+        "on_epoch_histogram_energy_label": "Particle Energy [MeV]",
+        "on_epoch_histogram_pos_label": "Position [mm]",
+        "on_epoch_histogram_length_label": "Length [mm]",
+        # images
+        "on_epoch_histogram_image_figure_x_size": 15,
+        "on_epoch_histogram_image_figure_y_size": 10,
+        "on_epoch_histogram_image_vs_particle_energy_name": "Approx. Particle Energy",
+        "on_epoch_histogram_image_vs_particle_energy_group": "Approx. Energy",
+        "on_epoch_histogram_image_vs_cluster_width_name": "Approx. Cluster Width",
+        "on_epoch_histogram_image_vs_cluster_width_group": "Approx. Cluster Width",
+        "on_epoch_histogram_image_vs_cluster_height_name": "Approx. Cluster Height",
+        "on_epoch_histogram_image_vs_cluster_height_group": "Approx. Cluster Height",
+        "on_epoch_histogram_image_vs_cluster_x_pos_name": "Approx. Cluster X Position",
+        "on_epoch_histogram_image_vs_cluster_x_pos_group": "Approx. Cluster X Position",
+        "on_epoch_histogram_image_vs_cluster_y_pos_name": "Approx. Cluster Y Position",
+        "on_epoch_histogram_image_vs_cluster_y_pos_group": "Approx. Cluster Y Position",
+
         # needed for the position converter,
         "img_x_max": -1,
         "img_x_min": -1,
@@ -141,6 +197,7 @@ class Config:
     _options_with_dirs = [
         "tfrecords_files",
         "tfrecords_validation_files",
+        "tfrecords_test_files",
         "load_weight_path",
     ]
 
@@ -200,6 +257,7 @@ class Config:
             self.features_no = 4 + self.energy_cols_no + self.classes_no
         if freeze:
             self._freeze()
+        self.check_compatibility()
 
     def _set_working_area(self):
         repo = git.Repo(".", search_parent_directories=True)
@@ -316,8 +374,12 @@ class Config:
             self._freeze()
 
     def check_compatibility(self):
+        msg = ""
         if not self.convert_energy in ['normalize', 'standardize']:
             msg = "You can either normalize or standardize energies"
+        elif self.on_epoch_samples > self.test_samples:
+            msg = "On epoch samples must be < test samples"
+        if msg:
             self.log.error(msg)
             raise ValueError(msg)
 

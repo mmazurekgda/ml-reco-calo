@@ -18,50 +18,13 @@ from tensorflow.keras.callbacks import (
 from cnn.config import Config
 from cnn.dataset import Dataset
 from cnn.core import CNNCore
-
-registered_interruptions = 0
-
-
-class StopTrainingSignal(Exception):
-    pass
-
-
-class CNNCustomCallback(tf.keras.callbacks.Callback):
-    def __init__(self, logger=None):
-        super().__init__()
-        self.log = logger
-
-    def on_epoch_end(self, epoch, logs=None):
-        loss = logs.get('loss', 'UNKNOWN')
-        val_loss = logs.get('val_loss', 'UNKNOWN')
-        self.log.info(
-            f"\n--> Epoch: {epoch}, 'loss': {loss}, 'val_loss': {val_loss}"
-        )
-
-    def on_batch_end(self, batch, logs=None):
-        global registered_interruptions
-        if registered_interruptions >= 2:
-            self.model.stop_training = True
-
+from cnn.callbacks import (
+    StopTrainingSignal,
+    CNNLoggingCallback,
+    CNNTestingCallback,
+)
 
 class CNN(CNNCore):
-    def _stop_training_handler(self):
-        def handler(signum, frame):
-            global registered_interruptions
-            registered_interruptions += 1
-            if registered_interruptions == 1:
-                self.log.warning(
-                    "\nRegistered CTRL+C. Press again to stop the training safely."
-                )
-            elif registered_interruptions == 2:
-                self.log.error(
-                    "\nRegistered CTRL+C. Safe stopping. Press again to stop the training IMMEDIATELY."
-                )
-            else:
-                self.log.fatal("\nStopping the training immediately!")
-                raise StopTrainingSignal()
-
-        return handler
 
     def __init__(
         self,
@@ -80,13 +43,16 @@ class CNN(CNNCore):
         if not dataloader:
             self.log.error("-> Dataloader not specified")
         self.dataloader = dataloader(config)
-        self.val_dataloader = dataloader(config, training=False)
+        self.val_dataloader = dataloader(config, stage="validation")
+        self.test_dataloader = dataloader(config, stage="testing")
 
         # Load data
         dataset = self.dataloader
         self.dataset = self.parse_dataset(dataset)
         val_dataset = self.val_dataloader
         self.val_dataset = self.parse_dataset(val_dataset)
+        # FIXME: idiotic!
+        self.test_dataset = self.test_dataloader
 
     def transform_dataset(self, x, y):
         return (self.transform_images(x), self.transform_targets(y))
@@ -110,8 +76,13 @@ class CNN(CNNCore):
 
     def train(self, no_devices=1):
         self.log.info("-> Preparing the training procedure...")
+
         # Callbacks
-        callbacks = [CNNCustomCallback(logger=self.log)]
+        callbacks = []
+
+        standard_log_callback = CNNLoggingCallback(logger=self.log)
+        callbacks.append(standard_log_callback)
+
         if self.config.reduce_lr:
             self.log.debug("-> Adding ReduceLROnPlateau callback")
             callbacks.append(
@@ -155,6 +126,15 @@ class CNN(CNNCore):
                     embeddings_metadata=self.config.tensorboard_embeddings_metadata,
                 )
             )
+        if self.config.testing:
+            callbacks.append(
+                CNNTestingCallback(
+                    self.config,
+                    self.log,
+                    self.test_dataset,
+                    self.transform_images,
+                )
+            )
 
         self.model = self.model(self.config)
 
@@ -163,6 +143,14 @@ class CNN(CNNCore):
             self.log.debug(f"-> Loading weights from: {paths}")
             self.model.load_weights(paths)
 
+        input_shape = [
+            self.config.batch_size,
+            None,
+            None,
+            self.config.channels
+        ]
+        #self.model(tf.ones(shape=input_shape))
+        self.model.build(input_shape)
         self.model.summary(print_fn=lambda x: self.log.debug(x))
 
         self.log.debug("-> Adding the optimizer.")
@@ -173,7 +161,7 @@ class CNN(CNNCore):
         self.log.debug("-> Done.")
         self.log.info("-> Training...")
         try:
-            signal.signal(signal.SIGINT, self._stop_training_handler())
+            signal.signal(signal.SIGINT, standard_log_callback.stop_training_handler())
             self.model.fit(
                 self.dataset,
                 epochs=self.config.epochs,

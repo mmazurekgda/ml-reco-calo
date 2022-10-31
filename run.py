@@ -55,7 +55,7 @@ def model_lookup(model_name):
     models_location = "cnn.models"
     this_model_location = ".".join([models_location, model_name])
     try:
-        model = getattr(import_module(this_model_location), "model")
+        model = getattr(import_module(this_model_location), "Model")
         log.debug(f"-> Imported '{model_name}' from '{models_location}'.")
     except AttributeError:
         log.error("-> No model() definition in your model!")
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     from cnn.run import CNN
     framework = CNN(
         dataloader=dataloader(),
-        model=model(),
+        model=model,
         config=config,
     )
 
