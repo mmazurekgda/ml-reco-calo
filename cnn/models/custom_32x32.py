@@ -12,6 +12,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.regularizers import l2
 
+
 class SimpleConv(Conv2D):
     def __init__(
         self,
@@ -40,6 +41,7 @@ class SimpleConv(Conv2D):
             x = self.batch_norm_layer(x)
             x = LeakyReLU(alpha=0.1)(x)
         return x
+
 
 class Model(tf.keras.Model):
     def __init__(self, config):
@@ -81,7 +83,7 @@ class Model(tf.keras.Model):
     def call(
         self,
         inputs,
-        training=True, # not doing the job because model(training) = model(valdiation)
+        training=True,  # not doing the job because model(training) = model(valdiation)
     ):
         x = self._backbone(inputs)
         # below for testing only!
@@ -92,7 +94,9 @@ class Model(tf.keras.Model):
         return x
 
     def refine(self, x):
-        return self.config.refine_boxes(x, self.config.anchors[self.config.anchor_masks[0]])
+        return self.config.refine_boxes(
+            x, self.config.anchors[self.config.anchor_masks[0]]
+        )
 
     def nms(self, x):
         return self.config.nms(x)
@@ -123,4 +127,4 @@ class Model(tf.keras.Model):
         x = self.conv_11(x)
         x = self.conv_12(x)
         output_0 = self.lambda_1(x)
-        return (output_0, )
+        return (output_0,)

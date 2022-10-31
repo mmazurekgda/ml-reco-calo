@@ -12,9 +12,9 @@ class Config:
         "learning_rate": 1e-4,
         "epochs": 30,
         "batch_size": 1,
-        'samples': -1,
-        'validation_samples': -1,
-        'test_samples': -1,
+        "samples": -1,
+        "validation_samples": -1,
+        "test_samples": -1,
         # 'validation_split': .2,
         "iou_ignore": 0.5,
         "dataset_cache": False,
@@ -66,9 +66,9 @@ class Config:
         "classes": ["one"],
         "iou_threshold": 0.5,
         # the two below should investigated during validation
-        "score_threshold": float('-inf'),
+        "score_threshold": float("-inf"),
         # the two below should investigated during validation
-        "soft_nms_sigma": 0.,
+        "soft_nms_sigma": 0.0,
     }
 
     TEST_OPTIONS = {
@@ -124,14 +124,13 @@ class Config:
         "on_epoch_histogram_image_vs_cluster_x_pos_group": "Approx. Cluster X Position",
         "on_epoch_histogram_image_vs_cluster_y_pos_name": "Approx. Cluster Y Position",
         "on_epoch_histogram_image_vs_cluster_y_pos_group": "Approx. Cluster Y Position",
-
         # needed for the position converter,
         "img_x_max": -1,
         "img_x_min": -1,
         "img_y_max": -1,
         "img_y_min": -1,
         # needed for the energy converter,
-        "convert_energy": "normalize", # or standardize
+        "convert_energy": "normalize",  # or standardize
         "std_particle_energy": -1,
         "mean_particle_energy": -1,
         "max_particle_energy": -1,
@@ -375,7 +374,7 @@ class Config:
 
     def check_compatibility(self):
         msg = ""
-        if not self.convert_energy in ['normalize', 'standardize']:
+        if not self.convert_energy in ["normalize", "standardize"]:
             msg = "You can either normalize or standardize energies"
         elif self.on_epoch_samples > self.test_samples:
             msg = "On epoch samples must be < test samples"
@@ -387,10 +386,13 @@ class Config:
         if self.convert_energy == "standardize":
             return energy * self.std_particle_energy + self.mean_particle_energy
         if self.convert_energy == "normalize":
-            return energy * (self.max_particle_energy - self.min_particle_energy) + self.min_particle_energy
+            return (
+                energy * (self.max_particle_energy - self.min_particle_energy)
+                + self.min_particle_energy
+            )
         raise NotImplementedError()
 
-    def convert_to_position(self, position, dim='x'):
+    def convert_to_position(self, position, dim="x"):
         if dim == "x":
             return position * (self.img_x_max - self.img_x_min) + self.img_x_min
         if dim == "y":

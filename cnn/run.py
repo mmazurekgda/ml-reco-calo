@@ -24,8 +24,8 @@ from cnn.callbacks import (
     CNNTestingCallback,
 )
 
-class CNN(CNNCore):
 
+class CNN(CNNCore):
     def __init__(
         self,
         model=None,
@@ -38,7 +38,7 @@ class CNN(CNNCore):
 
         if not model:
             self.log.error("-> Model not specified")
-        self.model = model#(config)
+        self.model = model  # (config)
 
         if not dataloader:
             self.log.error("-> Dataloader not specified")
@@ -143,13 +143,8 @@ class CNN(CNNCore):
             self.log.debug(f"-> Loading weights from: {paths}")
             self.model.load_weights(paths)
 
-        input_shape = [
-            self.config.batch_size,
-            None,
-            None,
-            self.config.channels
-        ]
-        #self.model(tf.ones(shape=input_shape))
+        input_shape = [self.config.batch_size, None, None, self.config.channels]
+        # self.model(tf.ones(shape=input_shape))
         self.model.build(input_shape)
         self.model.summary(print_fn=lambda x: self.log.debug(x))
 
@@ -167,10 +162,14 @@ class CNN(CNNCore):
                 epochs=self.config.epochs,
                 validation_data=self.val_dataset,
                 # TF 2.0: needed to avoid errors at the end of loop
-                steps_per_epoch=self.config.samples // self.config.batch_size // no_devices,
+                steps_per_epoch=self.config.samples
+                // self.config.batch_size
+                // no_devices,
                 # validation_data=vs,
                 # TF 2.0: needed to avoid errors at the end of loop
-                validation_steps=self.config.validation_samples // self.config.batch_size // no_devices,
+                validation_steps=self.config.validation_samples
+                // self.config.batch_size
+                // no_devices,
                 callbacks=callbacks,
             )
         except StopTrainingSignal:

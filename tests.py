@@ -2,8 +2,12 @@ import numpy as np
 import time
 import tensorflow as tf
 
+
 def ragged_to_normal(np_array):
-    return np.array([elem for elem in np_array if not (type(elem) == np.ndarray and elem.size == 0)])
+    return np.array(
+        [elem for elem in np_array if not (type(elem) == np.ndarray and elem.size == 0)]
+    )
+
 
 def convert_data(config, tests):
     tests["pred_energy"] = config.convert_to_energy(tests["pred_energy"])
@@ -51,10 +55,10 @@ def prepare_dataset_for_inference(
     log.debug("-> Applying NMS per event in the testing dataset..")
     preds = []
     for event in range(len(xs)):
-        pre_nms = [[pred[0][event],
-                    pred[1][event],
-                    pred[2][event],
-                    pred[3][event]] for pred in raw_preds]
+        pre_nms = [
+            [pred[0][event], pred[1][event], pred[2][event], pred[3][event]]
+            for pred in raw_preds
+        ]
         preds.append(model.nms(pre_nms))
     times["NMS"] = time.process_time() - times["Inference"] - start_time
     times["Total"] = time.process_time() - start_time
@@ -65,7 +69,6 @@ def prepare_dataset_for_inference(
         msg += f" {round(seconds * 1000 / len(xs), 3)} ms/event"
         msg += f" {round(seconds / times['Total'] * 100, 3)} % total time"
         log.debug(msg)
-
 
     for pred, y in zip(preds, ys):
         true_positions.append(y[..., 0:4].numpy())

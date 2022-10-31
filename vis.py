@@ -2,12 +2,13 @@ import numpy as np
 from matplotlib import pyplot as plt
 import mplhep as hep
 
+
 def find_axis_label(label):
-    if 'x_pos' in label or 'y_pos' in label:
+    if "x_pos" in label or "y_pos" in label:
         return "on_epoch_histogram_pos_label"
-    if 'width' in label or 'height' in label:
+    if "width" in label or "height" in label:
         return "on_epoch_histogram_length_label"
-    if  'energy' in label:
+    if "energy" in label:
         return "on_epoch_histogram_energy_label"
     return ""
 
@@ -19,7 +20,7 @@ def plot_histograms(
     data_colors,
     bins=100,
     offset_bins_no=3,
-    histtype='step',
+    histtype="step",
     **kwargs
 ):
     plot_bins = bins
@@ -27,7 +28,6 @@ def plot_histograms(
     min_value, max_value = merged.min(), merged.max()
     span = abs(max_value - min_value)
     step_width = span / bins
-
 
     try:
         plot_bins = np.arange(
@@ -45,19 +45,14 @@ def plot_histograms(
             hist,
             bins,
             ax=ax,
-            histtype='errorbar',
+            histtype="errorbar",
             xerr=True,
             label=data_label,
             color=data_color,
         )
 
-def plot_scatter_plots(
-    ax,
-    data_tuple,
-    data_labels,
-    data_colors,
-    **kwargs
-):
+
+def plot_scatter_plots(ax, data_tuple, data_labels, data_colors, **kwargs):
     for data, data_label, data_color in zip(data_tuple, data_labels, data_colors):
         ax.scatter(
             data[0],

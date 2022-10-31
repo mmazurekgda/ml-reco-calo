@@ -18,8 +18,10 @@ from vis import (
 
 registered_interruptions = 0
 
+
 class StopTrainingSignal(Exception):
     pass
+
 
 class CNNLoggingCallback(tf.keras.callbacks.Callback):
     def __init__(self, logger=None):
@@ -45,16 +47,15 @@ class CNNLoggingCallback(tf.keras.callbacks.Callback):
         return handler
 
     def on_epoch_end(self, epoch, logs=None):
-        loss = logs.get('loss', 'UNKNOWN')
-        val_loss = logs.get('val_loss', 'UNKNOWN')
-        self.log.info(
-            f"\n--> Epoch: {epoch}, 'loss': {loss}, 'val_loss': {val_loss}"
-        )
+        loss = logs.get("loss", "UNKNOWN")
+        val_loss = logs.get("val_loss", "UNKNOWN")
+        self.log.info(f"\n--> Epoch: {epoch}, 'loss': {loss}, 'val_loss': {val_loss}")
 
     def on_batch_end(self, batch, logs=None):
         global registered_interruptions
         if registered_interruptions >= 2:
             self.model.stop_training = True
+
 
 class CNNTestingCallback(tf.keras.callbacks.Callback):
     def __init__(self, config, logger, dataset, image_transformation):
@@ -63,7 +64,9 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         self.config = config
         self.dataset = dataset
         self.image_transformation = image_transformation
-        self.histogram_writer = tf.summary.create_file_writer(f"{self.config.tensorboard_log_dir}/testing_during_training")
+        self.histogram_writer = tf.summary.create_file_writer(
+            f"{self.config.tensorboard_log_dir}/testing_during_training"
+        )
         self.timings = defaultdict(list)
 
     def _make_image_from_plot(
@@ -83,7 +86,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             figsize=(
                 self.config.on_epoch_histogram_image_figure_x_size,
                 self.config.on_epoch_histogram_image_figure_y_size,
-            )
+            ),
         )
         if plot_type == "hist":
             plot_histograms(
@@ -108,13 +111,12 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         plt.ylabel(ylabel)
         plt.legend()
         buf = io.BytesIO()
-        plt.savefig(buf, format='png')
+        plt.savefig(buf, format="png")
         plt.close(fig)
         buf.seek(0)
         image = tf.image.decode_png(buf.getvalue(), channels=4)
         image = tf.expand_dims(image, 0)
         return image
-
 
     def _make_epoch_histograms(self, step, histo_data):
         with self.histogram_writer.as_default():
@@ -127,28 +129,34 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                     histo_values,
                     step=step,
                     buckets=self.config.on_epoch_histogram_buckets,
-                    description=getattr(self.config, f"on_epoch_histogram_{histo_type}_description"),
+                    description=getattr(
+                        self.config, f"on_epoch_histogram_{histo_type}_description"
+                    ),
                 )
 
     def _make_epoch_histogram_images(self, step, histo_data, img_keys):
         with self.histogram_writer.as_default():
             for img_name, img_data in img_keys.items():
                 name = getattr(self.config, f"on_epoch_histogram_image_{img_name}_name")
-                group = getattr(self.config, f"on_epoch_histogram_image_{img_name}_group")
+                group = getattr(
+                    self.config, f"on_epoch_histogram_image_{img_name}_group"
+                )
                 full_name = " / ".join([group, name])
                 image = self._make_image_from_plot(
                     f"{name}, Epoch: {step}",
                     [histo_data[key] for key in img_data["histo_keys"]],
                     img_data["data_labels"],
                     img_data["data_colors"],
-                    xlabel=getattr(self.config, find_axis_label(img_data["histo_keys"][0]), "")
+                    xlabel=getattr(
+                        self.config, find_axis_label(img_data["histo_keys"][0]), ""
+                    ),
                 )
                 tf.summary.image(full_name, image, step=step)
 
     def _make_epoch_performance_scalars(self, step, timings, data):
         with self.histogram_writer.as_default():
             for timing_name, timing_value in timings.items():
-                time_per_event = timing_value / len(data["true_position"]) * 1000.
+                time_per_event = timing_value / len(data["true_position"]) * 1000.0
                 tf.summary.scalar(
                     f"Timing/{timing_name}",
                     time_per_event,
@@ -166,8 +174,6 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             )
             tf.summary.image("Timing/Summary", image, step=step)
 
-
-
     def on_epoch_end(self, epoch, logs=None):
         self.log.debug(f"Testing epoch {epoch} with {self.config.on_epoch_samples}.")
         times, tests = prepare_dataset_for_inference(
@@ -175,7 +181,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             self.image_transformation,
             self.model,
             self.dataset,
-            self.config.on_epoch_samples
+            self.config.on_epoch_samples,
         )
 
         convert_data(self.config, tests)
@@ -185,14 +191,30 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         histo_data = {
             "true_energy": tests["true_energy"],
             "pred_energy": tests["pred_energy"],
-            "true_width": tests["true_position"][..., 2] - tests["true_position"][..., 0],
-            "pred_width": tests["pred_position"][..., 2] -  tests["pred_position"][..., 0],
-            "true_height": tests["true_position"][..., 3] - tests["true_position"][..., 1],
-            "pred_height": tests["pred_position"][..., 3] - tests["pred_position"][..., 1],
-            "true_x_pos": (tests["true_position"][..., 2] + tests["true_position"][..., 0]) / 2.,
-            "pred_x_pos": (tests["pred_position"][..., 2] + tests["pred_position"][..., 0]) / 2.,
-            "true_y_pos": (tests["true_position"][..., 3] + tests["true_position"][..., 1]) / 2.,
-            "pred_y_pos": (tests["pred_position"][..., 3] + tests["pred_position"][..., 1]) / 2.,
+            "true_width": tests["true_position"][..., 2]
+            - tests["true_position"][..., 0],
+            "pred_width": tests["pred_position"][..., 2]
+            - tests["pred_position"][..., 0],
+            "true_height": tests["true_position"][..., 3]
+            - tests["true_position"][..., 1],
+            "pred_height": tests["pred_position"][..., 3]
+            - tests["pred_position"][..., 1],
+            "true_x_pos": (
+                tests["true_position"][..., 2] + tests["true_position"][..., 0]
+            )
+            / 2.0,
+            "pred_x_pos": (
+                tests["pred_position"][..., 2] + tests["pred_position"][..., 0]
+            )
+            / 2.0,
+            "true_y_pos": (
+                tests["true_position"][..., 3] + tests["true_position"][..., 1]
+            )
+            / 2.0,
+            "pred_y_pos": (
+                tests["pred_position"][..., 3] + tests["pred_position"][..., 1]
+            )
+            / 2.0,
         }
 
         img_keys = {
@@ -229,4 +251,3 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         self._make_epoch_histograms(epoch, histo_data)
         self._make_epoch_histogram_images(epoch, histo_data, img_keys)
         self.log.debug(f"Done.")
-
