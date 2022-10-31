@@ -39,7 +39,6 @@ def plot_histograms(
         plot_bins = bins
         pass
 
-    plt.style.use(hep.style.LHCb2)
     for data, data_label, data_color in zip(data_tuple, data_labels, data_colors):
         hist, bins = np.histogram(data, bins=plot_bins)
         hep.histplot(
@@ -48,6 +47,21 @@ def plot_histograms(
             ax=ax,
             histtype='errorbar',
             xerr=True,
+            label=data_label,
+            color=data_color,
+        )
+
+def plot_scatter_plots(
+    ax,
+    data_tuple,
+    data_labels,
+    data_colors,
+    **kwargs
+):
+    for data, data_label, data_color in zip(data_tuple, data_labels, data_colors):
+        ax.scatter(
+            data[0],
+            data[1],
             label=data_label,
             color=data_color,
         )

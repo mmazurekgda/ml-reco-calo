@@ -7,9 +7,12 @@ from tests import (
 )
 import io
 from matplotlib import pyplot as plt
+import mplhep as hep
+from collections import defaultdict
 
 from vis import (
     plot_histograms,
+    plot_scatter_plots,
     find_axis_label,
 )
 
@@ -61,6 +64,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         self.dataset = dataset
         self.image_transformation = image_transformation
         self.histogram_writer = tf.summary.create_file_writer(f"{self.config.tensorboard_log_dir}/testing_during_training")
+        self.timings = defaultdict(list)
 
     def _make_image_from_plot(
         self,
@@ -69,7 +73,10 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         data_labels,
         data_colors,
         xlabel="",
+        ylabel="",
+        plot_type="hist",
     ):
+        plt.style.use(hep.style.LHCb2)
         fig, ax = plt.subplots(
             1,
             1,
@@ -78,15 +85,27 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 self.config.on_epoch_histogram_image_figure_y_size,
             )
         )
-        plot_histograms(
-            ax,
-            data_tuple,
-            data_labels,
-            data_colors,
-            bins=self.config.on_epoch_histogram_buckets,
-        )
+        if plot_type == "hist":
+            plot_histograms(
+                ax,
+                data_tuple,
+                data_labels,
+                data_colors,
+                bins=self.config.on_epoch_histogram_buckets,
+            )
+        elif plot_type == "scatter":
+            plot_scatter_plots(
+                ax,
+                data_tuple,
+                data_labels,
+                data_colors,
+            )
+        else:
+            raise NotImplementedError()
+
         plt.title(name)
         plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
         plt.legend()
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
@@ -126,16 +145,42 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 )
                 tf.summary.image(full_name, image, step=step)
 
+    def _make_epoch_performance_scalars(self, step, timings, data):
+        with self.histogram_writer.as_default():
+            for timing_name, timing_value in timings.items():
+                time_per_event = timing_value / len(data["true_position"]) * 1000.
+                tf.summary.scalar(
+                    f"Timing/{timing_name}",
+                    time_per_event,
+                    step=step,
+                )
+                self.timings[timing_name].append(time_per_event)
+            image = self._make_image_from_plot(
+                f"Timing Summary, Epoch: {step}",
+                [[range(len(values)), values] for values in self.timings.values()],
+                self.timings.keys(),
+                ["b", "g", "r", "c", "m"],
+                xlabel="Epoch",
+                ylabel="Time per event [ms]",
+                plot_type="scatter",
+            )
+            tf.summary.image("Timing/Summary", image, step=step)
+
+
+
     def on_epoch_end(self, epoch, logs=None):
         self.log.debug(f"Testing epoch {epoch} with {self.config.on_epoch_samples}.")
-        tests = prepare_dataset_for_inference(
+        times, tests = prepare_dataset_for_inference(
             self.log,
             self.image_transformation,
             self.model,
             self.dataset,
             self.config.on_epoch_samples
         )
+
         convert_data(self.config, tests)
+
+        self._make_epoch_performance_scalars(epoch, times, tests)
 
         histo_data = {
             "true_energy": tests["true_energy"],

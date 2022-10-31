@@ -74,7 +74,7 @@ def prepare_dataset_for_inference(
         positions.append(pred[0].numpy())
         scores.append(pred[3].numpy())
 
-    return {
+    return times, {
         "pred_energy": np.array(energies, dtype=object),
         "true_energy": np.array(true_energies, dtype=object),
         "score": np.array(scores, dtype=object),
