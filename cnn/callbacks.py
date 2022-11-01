@@ -13,7 +13,9 @@ from collections import defaultdict
 from vis import (
     plot_histograms,
     plot_scatter_plots,
+    plot_event,
     find_axis_label,
+    add_lhcb_like_label,
 )
 
 registered_interruptions = 0
@@ -84,9 +86,15 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             1,
             1,
             figsize=(
-                self.config.on_epoch_histogram_image_figure_x_size,
-                self.config.on_epoch_histogram_image_figure_y_size,
+                self.config.testing_image_figure_x_size,
+                self.config.testing_image_figure_y_size,
             ),
+        )
+        add_lhcb_like_label(
+            exp=self.config.testing_image_label_exp,
+            llabel=self.config.testing_image_label_llabel,
+            rlabel=self.config.testing_image_label_rlabel,
+            ax=ax
         )
         if plot_type == "hist":
             plot_histograms(
@@ -94,7 +102,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 data_tuple,
                 data_labels,
                 data_colors,
-                bins=self.config.on_epoch_histogram_buckets,
+                bins=self.config.testing_image_histogram_buckets,
             )
         elif plot_type == "scatter":
             plot_scatter_plots(
@@ -102,6 +110,20 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 data_tuple,
                 data_labels,
                 data_colors,
+            )
+        elif plot_type == "event":
+            plot_event(
+                ax,
+                data_tuple,
+                data_labels,
+                data_colors,
+                min_hit_energy=self.config.min_hit_energy,
+                img_x_min=self.config.img_x_min,
+                img_x_max=self.config.img_x_max,
+                img_y_min=self.config.img_y_min,
+                img_y_max=self.config.img_y_max,
+                img_width=self.config.img_width,
+                img_height=self.config.img_height,
             )
         else:
             raise NotImplementedError()
@@ -119,6 +141,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         return image
 
     def _make_epoch_histograms(self, step, histo_data):
+        self.log.debug("-> Generating histograms...")
         with self.histogram_writer.as_default():
             for histo_type, histo_values in histo_data.items():
                 name = getattr(self.config, f"on_epoch_histogram_{histo_type}_name")
@@ -128,13 +151,14 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                     full_name,
                     histo_values,
                     step=step,
-                    buckets=self.config.on_epoch_histogram_buckets,
+                    buckets=self.config.testing_image_histogram_buckets,
                     description=getattr(
                         self.config, f"on_epoch_histogram_{histo_type}_description"
                     ),
                 )
 
     def _make_epoch_histogram_images(self, step, histo_data, img_keys):
+        self.log.debug("-> Generating histogram images...")
         with self.histogram_writer.as_default():
             for img_name, img_data in img_keys.items():
                 name = getattr(self.config, f"on_epoch_histogram_image_{img_name}_name")
@@ -153,7 +177,26 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 )
                 tf.summary.image(full_name, image, step=step)
 
+    def _make_epoch_histogram_events(self, step, tuples):
+        self.log.debug("-> Generating gallery of events...")
+        with self.histogram_writer.as_default():
+            for evt, (hits, ys, preds) in enumerate(zip(*tuples)):
+                name = f"Example {evt}"
+                group = "Gallery"
+                full_name = " / ".join([group, name])
+                image = self._make_image_from_plot(
+                    f"{name}, Epoch: {step}",
+                    [hits, ys, preds],
+                    [], # empty for now, maybe later
+                    [], # empty for now, maybe later
+                    xlabel=f"X {getattr(self.config, find_axis_label('x_pos'))}",
+                    ylabel=f"Y {getattr(self.config, find_axis_label('y_pos'))}",
+                    plot_type="event",
+                )
+                tf.summary.image(full_name, image, step=step)
+
     def _make_epoch_performance_scalars(self, step, timings, data):
+        self.log.debug("-> Generating performance & timing values/plots...")
         with self.histogram_writer.as_default():
             for timing_name, timing_value in timings.items():
                 time_per_event = timing_value / len(data["true_position"]) * 1000.0
@@ -245,9 +288,16 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             },
         }
 
+        gallery_events = [
+            np.squeeze(tests["images"][:10]),
+            tests["true_position"][:10, ..., :4],
+            tests["pred_position"][:10, ..., :4],
+        ]
+
         for histo_type, histo_values in histo_data.items():
             histo_data[histo_type] = ragged_to_normal(histo_values.flatten())
 
         self._make_epoch_histograms(epoch, histo_data)
         self._make_epoch_histogram_images(epoch, histo_data, img_keys)
+        self._make_epoch_histogram_events(epoch, gallery_events)
         self.log.debug(f"Done.")

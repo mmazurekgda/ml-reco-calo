@@ -74,8 +74,14 @@ class Config:
     TEST_OPTIONS = {
         "testing": True,
         "on_epoch_samples": -1,
+        # general labels
+        "testing_image_label_exp": "Gaussino",
+        "testing_image_label_llabel": "Preliminary",
+        "testing_image_label_rlabel": "",
+        "testing_image_figure_x_size": 15,
+        "testing_image_figure_y_size": 10,
+        "testing_image_histogram_buckets": 100,
         # histograms
-        "on_epoch_histogram_buckets": 100,
         "on_epoch_histogram_writer_name": "clusterization",
         "on_epoch_histogram_true_energy_name": "Approx. True Particle Energy",
         "on_epoch_histogram_true_energy_group": "Approx. Energy",
@@ -112,8 +118,6 @@ class Config:
         "on_epoch_histogram_pos_label": "Position [mm]",
         "on_epoch_histogram_length_label": "Length [mm]",
         # images
-        "on_epoch_histogram_image_figure_x_size": 15,
-        "on_epoch_histogram_image_figure_y_size": 10,
         "on_epoch_histogram_image_vs_particle_energy_name": "Approx. Particle Energy",
         "on_epoch_histogram_image_vs_particle_energy_group": "Approx. Energy",
         "on_epoch_histogram_image_vs_cluster_width_name": "Approx. Cluster Width",
@@ -129,6 +133,9 @@ class Config:
         "img_x_min": -1,
         "img_y_max": -1,
         "img_y_min": -1,
+        # needed for the hit converter
+        "max_hit_energy": -1,
+        "min_hit_energy": -1,
         # needed for the energy converter,
         "convert_energy": "normalize",  # or standardize
         "std_particle_energy": -1,
@@ -391,6 +398,9 @@ class Config:
                 + self.min_particle_energy
             )
         raise NotImplementedError()
+
+    def convert_to_hit_energy(self, energy):
+        return energy * (self.max_hit_energy - self.min_hit_energy) + self.min_hit_energy
 
     def convert_to_position(self, position, dim="x"):
         if dim == "x":

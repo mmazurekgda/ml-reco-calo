@@ -2,18 +2,20 @@ import numpy as np
 import time
 import tensorflow as tf
 
-
 def ragged_to_normal(np_array):
     return np.array(
         [elem for elem in np_array if not (type(elem) == np.ndarray and elem.size == 0)]
     )
 
-
 def convert_data(config, tests):
     tests["pred_energy"] = config.convert_to_energy(tests["pred_energy"])
     tests["true_energy"] = config.convert_to_energy(tests["true_energy"])
-    tests["pred_position"] = config.convert_to_position(tests["pred_position"])
-    tests["true_position"] = config.convert_to_position(tests["true_position"])
+    for position_type in ["pred_position", "true_position"]:
+        tests[position_type][..., 0]= config.convert_to_position(tests[position_type][..., 0], dim="x")
+        tests[position_type][..., 2]= config.convert_to_position(tests[position_type][..., 2], dim="x")
+        tests[position_type][..., 1]= config.convert_to_position(tests[position_type][..., 1], dim="y")
+        tests[position_type][..., 3]= config.convert_to_position(tests[position_type][..., 3], dim="y")
+    tests["images"] = config.convert_to_hit_energy(tests["images"])
 
 
 def prepare_dataset_for_inference(
@@ -83,4 +85,5 @@ def prepare_dataset_for_inference(
         "score": np.array(scores, dtype=object),
         "pred_position": np.array(positions, dtype=object),
         "true_position": np.array(true_positions, dtype=object),
+        "images": np.array(xs),
     }
