@@ -400,7 +400,9 @@ class Config:
         raise NotImplementedError()
 
     def convert_to_hit_energy(self, energy):
-        return energy * (self.max_hit_energy - self.min_hit_energy) + self.min_hit_energy
+        return (
+            energy * (self.max_hit_energy - self.min_hit_energy) + self.min_hit_energy
+        )
 
     def convert_to_position(self, position, dim="x"):
         if dim == "x":

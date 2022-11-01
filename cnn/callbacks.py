@@ -94,7 +94,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             exp=self.config.testing_image_label_exp,
             llabel=self.config.testing_image_label_llabel,
             rlabel=self.config.testing_image_label_rlabel,
-            ax=ax
+            ax=ax,
         )
         if plot_type == "hist":
             plot_histograms(
@@ -187,8 +187,8 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 image = self._make_image_from_plot(
                     f"{name}, Epoch: {step}",
                     [hits, ys, preds],
-                    [], # empty for now, maybe later
-                    [], # empty for now, maybe later
+                    [],  # empty for now, maybe later
+                    [],  # empty for now, maybe later
                     xlabel=f"X {getattr(self.config, find_axis_label('x_pos'))}",
                     ylabel=f"Y {getattr(self.config, find_axis_label('y_pos'))}",
                     plot_type="event",
