@@ -131,7 +131,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         plt.title(name)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
-        plt.legend()
+        plt.legend(loc=1)  # upper right
         buf = io.BytesIO()
         plt.savefig(buf, format="png")
         plt.close(fig)
@@ -152,9 +152,6 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                     histo_values,
                     step=step,
                     buckets=self.config.testing_image_histogram_buckets,
-                    description=getattr(
-                        self.config, f"on_epoch_histogram_{histo_type}_description"
-                    ),
                 )
 
     def _make_epoch_histogram_images(self, step, histo_data, img_keys):
@@ -220,45 +217,14 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.log.debug(f"Testing epoch {epoch} with {self.config.on_epoch_samples}.")
         times, tests = prepare_dataset_for_inference(
-            self.log,
+            self.config,
             self.image_transformation,
             self.model,
             self.dataset,
             self.config.on_epoch_samples,
         )
 
-        convert_data(self.config, tests)
-
         self._make_epoch_performance_scalars(epoch, times, tests)
-
-        histo_data = {
-            "true_energy": tests["true_energy"],
-            "pred_energy": tests["pred_energy"],
-            "true_width": tests["true_position"][..., 2]
-            - tests["true_position"][..., 0],
-            "pred_width": tests["pred_position"][..., 2]
-            - tests["pred_position"][..., 0],
-            "true_height": tests["true_position"][..., 3]
-            - tests["true_position"][..., 1],
-            "pred_height": tests["pred_position"][..., 3]
-            - tests["pred_position"][..., 1],
-            "true_x_pos": (
-                tests["true_position"][..., 2] + tests["true_position"][..., 0]
-            )
-            / 2.0,
-            "pred_x_pos": (
-                tests["pred_position"][..., 2] + tests["pred_position"][..., 0]
-            )
-            / 2.0,
-            "true_y_pos": (
-                tests["true_position"][..., 3] + tests["true_position"][..., 1]
-            )
-            / 2.0,
-            "pred_y_pos": (
-                tests["pred_position"][..., 3] + tests["pred_position"][..., 1]
-            )
-            / 2.0,
-        }
 
         img_keys = {
             "vs_particle_energy": {
@@ -281,10 +247,50 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 "data_labels": ["Truth", "Predicted"],
                 "data_colors": ["blue", "red"],
             },
+            "vs_cluster_x_pos_extended": {
+                "histo_keys": [
+                    "true_x_pos",
+                    "pred_x_pos",
+                    "matched_true_x_pos",
+                    "matched_pred_x_pos",
+                ],
+                "data_labels": [
+                    "Truth",
+                    "Predicted",
+                    "Matched Truth",
+                    "Matched Predicted",
+                ],
+                "data_colors": [
+                    "blue",
+                    "red",
+                    "cyan",
+                    "orange",
+                ],
+            },
             "vs_cluster_y_pos": {
                 "histo_keys": ["true_y_pos", "pred_y_pos"],
                 "data_labels": ["Truth", "Predicted"],
                 "data_colors": ["blue", "red"],
+            },
+            "vs_cluster_y_pos_extended": {
+                "histo_keys": [
+                    "true_y_pos",
+                    "pred_y_pos",
+                    "matched_true_y_pos",
+                    "matched_pred_y_pos",
+                ],
+                "data_labels": [
+                    "Truth",
+                    "Predicted",
+                    "Matched Truth",
+                    "Matched Predicted",
+                ],
+                "data_colors": [
+                    "blue",
+                    "red",
+                    "cyan",
+                    "orange",
+                ],
             },
         }
 
@@ -294,10 +300,18 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             tests["pred_position"][:10, ..., :4],
         ]
 
-        for histo_type, histo_values in histo_data.items():
-            histo_data[histo_type] = ragged_to_normal(histo_values.flatten())
+        non_histo_types = [
+            "images",
+            "true_position",
+            "pred_position",
+        ]
 
-        self._make_epoch_histograms(epoch, histo_data)
-        self._make_epoch_histogram_images(epoch, histo_data, img_keys)
+        histo_types = {k: v for k, v in tests.items() if k not in non_histo_types}
+
+        for histo_type, histo_values in histo_types.items():
+            histo_types[histo_type] = ragged_to_normal(histo_values.flatten())
+
+        self._make_epoch_histograms(epoch, histo_types)
+        self._make_epoch_histogram_images(epoch, histo_types, img_keys)
         self._make_epoch_histogram_events(epoch, gallery_events)
         self.log.debug(f"Done.")
