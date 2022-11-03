@@ -15,6 +15,7 @@ from vis import (
     plot_scatter_plots,
     plot_event,
     plot_confusion_matrix,
+    plot_energy_resolution,
     find_axis_label,
     add_lhcb_like_label,
 )
@@ -61,7 +62,25 @@ class CNNLoggingCallback(tf.keras.callbacks.Callback):
 
 
 class CNNTestingCallback(tf.keras.callbacks.Callback):
-    img_keys = {
+    non_automatic_histo_types = [
+        "images",
+        "true_position",
+        "pred_position",
+        "true_classes",
+        "pred_classes",
+        "matched_true_classes",
+        "matched_pred_classes",
+        "matched_true_energy",
+        "matched_pred_energy",
+        "ghost_x_pos",
+        "missed_x_pos",
+        "ghost_y_pos",
+        "missed_y_pos",
+        "ghost_x_energy",
+        "missed_x_energy",
+    ]
+
+    joint_histograms = {
         "vs_particle_energy": {
             "histo_keys": ["true_energy", "pred_energy"],
             "data_labels": ["Truth", "Predicted"],
@@ -139,6 +158,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             f"{self.config.tensorboard_log_dir}/testing_during_training"
         )
         self.timings = defaultdict(list)
+        self.clusters_no = defaultdict(list)
 
     def _make_image_from_plot(
         self,
@@ -153,6 +173,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         llabel=None,
         rlabel=None,
         loc=4,
+        fontsize=20,
         title=None,
     ):
         if title is None:
@@ -178,6 +199,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             llabel=llabel,
             rlabel=rlabel,
             loc=loc,
+            fontsize=fontsize,
         )
         if plot_type == "hist":
             plot_histograms(
@@ -186,6 +208,16 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 data_labels,
                 data_colors,
                 bins=self.config.testing_image_histogram_buckets,
+            )
+        elif plot_type == "energy_resolution":
+            plot_energy_resolution(
+                ax,
+                data_tuple,
+                data_labels,
+                data_colors,
+                bins=self.config.testing_image_histogram_buckets,
+                min_energy=self.config.min_particle_energy,
+                max_energy=self.config.max_particle_energy,
             )
         elif plot_type == "scatter":
             plot_scatter_plots(
@@ -213,6 +245,11 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 ax,
                 data_tuple,
                 self.config.classes,
+            )
+            # aspect ratio here is different... use x
+            fig.set_size_inches(
+                self.config.testing_image_figure_x_size,
+                self.config.testing_image_figure_x_size,
             )
         else:
             raise NotImplementedError()
@@ -255,7 +292,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
     def _make_epoch_histogram_images(self, step, histo_data):
         self.log.debug("-> Generating histogram images...")
         with self.histogram_writer.as_default():
-            for img_name, img_data in self.img_keys.items():
+            for img_name, img_data in self.joint_histograms.items():
                 name = getattr(self.config, f"on_epoch_histogram_image_{img_name}_name")
                 group = getattr(
                     self.config, f"on_epoch_histogram_image_{img_name}_group"
@@ -271,6 +308,21 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                     ),
                 )
                 tf.summary.image(full_name, image, step=step)
+
+    def _make_epoch_energy_resolution(self, step, true_energy, pred_energy):
+        self.log.debug("-> Generating energy resolution image...")
+        with self.histogram_writer.as_default():
+            name = self.config.on_epoch_image_energy_resolution_name
+            group = self.config.on_epoch_image_energy_resolution_group
+            full_name = " / ".join([group, name])
+            image = self._make_image_from_plot(
+                f"{name}, Epoch: {step}",
+                [true_energy, pred_energy],
+                xlabel="Energy [MeV]",
+                ylabel=r"$\sigma$ / E [$\%$]",
+                plot_type="energy_resolution",
+            )
+            tf.summary.image(full_name, image, step=step)
 
     def _make_epoch_histogram_events(self, step, tuples):
         self.log.debug("-> Generating gallery of events...")
@@ -300,6 +352,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 plot_type="confusion_matrix",
                 title="",
                 loc=0,
+                fontsize=15,
             )
             tf.summary.image(full_name, image, step=step)
 
@@ -325,6 +378,33 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             )
             tf.summary.image("Timing/Summary", image, step=step)
 
+            data_types_names = {
+                "true_x_pos": "Truth",
+                "pred_x_pos": "Predicted",
+                "matched_pred_x_pos": "Matched",
+                "ghost_x_pos": "Ghost",
+                "missed_x_pos": "Missed",
+            }
+            for data_type, data_name in data_types_names.items():
+                clusters_no_tmp = len(ragged_to_normal(data[data_type].flatten()))
+                self.log.debug(f"--> {data_name} Clusters No.: {clusters_no_tmp}")
+                tf.summary.scalar(
+                    f"Performance/{data_name}",
+                    clusters_no_tmp,
+                    step=step,
+                )
+                self.clusters_no[data_type].append(clusters_no_tmp)
+            image = self._make_image_from_plot(
+                f"Performance Summary, Epoch: {step}",
+                [[range(len(values)), values] for values in self.clusters_no.values()],
+                data_types_names.values(),
+                ["b", "g", "r", "c", "m"],
+                xlabel="Epoch",
+                ylabel="Clusters No.",
+                plot_type="scatter",
+            )
+            tf.summary.image("Performance/Summary", image, step=step)
+
     def on_epoch_end(self, epoch, logs=None):
         self.log.debug(f"Testing epoch {epoch} with {self.config.on_epoch_samples}.")
         times, tests = prepare_dataset_for_inference(
@@ -343,17 +423,9 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             tests["pred_position"][:10, ..., :4],
         ]
 
-        non_histo_types = [
-            "images",
-            "true_position",
-            "pred_position",
-            "true_classes",
-            "pred_classes",
-            "matched_true_classes",
-            "matched_pred_classes",
-        ]
-
-        histo_types = {k: v for k, v in tests.items() if k not in non_histo_types}
+        histo_types = {
+            k: v for k, v in tests.items() if k not in self.non_automatic_histo_types
+        }
         for histo_type, histo_values in histo_types.items():
             histo_types[histo_type] = ragged_to_normal(histo_values.flatten())
 
@@ -363,6 +435,11 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             ragged_to_normal(tests["matched_pred_classes"].flatten()),
         )
         self._make_epoch_histograms(epoch, histo_types)
+        self._make_epoch_energy_resolution(
+            epoch,
+            ragged_to_normal(tests["matched_true_energy"].flatten()),
+            ragged_to_normal(tests["matched_pred_energy"].flatten()),
+        )
         self._make_epoch_histogram_images(epoch, histo_types)
         self._make_epoch_histogram_events(epoch, gallery_events)
 

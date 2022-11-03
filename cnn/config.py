@@ -76,7 +76,7 @@ class Config:
         "on_epoch_samples": -1,
         # general labels
         "testing_image_label_exp": "Gaussino",
-        "testing_image_label_llabel": "Preliminary",
+        "testing_image_label_llabel": "Simulation Preliminary",
         "testing_image_label_rlabel": "",
         "testing_image_figure_x_size": 15,
         "testing_image_figure_y_size": 10,
@@ -132,6 +132,8 @@ class Config:
         "on_epoch_histogram_image_vs_cluster_y_pos_group": "Approx. Cluster Y Position",
         "on_epoch_histogram_image_vs_cluster_y_pos_extended_name": "Approx. Cluster Y Position (Extended)",
         "on_epoch_histogram_image_vs_cluster_y_pos_extended_group": "Approx. Cluster Y Position",
+        "on_epoch_image_energy_resolution_name": "Approx. Energy Resolution",
+        "on_epoch_image_energy_resolution_group": "Approx. Energy",
         # needed for the position converter,
         "img_x_max": -1,
         "img_x_min": -1,

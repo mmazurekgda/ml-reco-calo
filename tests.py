@@ -298,7 +298,15 @@ def prepare_dataset_for_inference(
     tests["matched_pred_x_pos"] = matching["matched_pred"][..., :1]
     tests["matched_true_y_pos"] = matching["matched_true"][..., 1:2]
     tests["matched_pred_y_pos"] = matching["matched_pred"][..., 1:2]
+    tests["matched_true_energy"] = matching["matched_true"][..., 2:3]
+    tests["matched_pred_energy"] = matching["matched_pred"][..., 2:3]
     tests["matched_true_classes"] = matching["matched_true"][..., 5:]
     tests["matched_pred_classes"] = matching["matched_pred"][..., 5:]
+    tests["ghost_x_pos"] = matching["ghost"][..., :1]
+    tests["missed_x_pos"] = matching["missed"][..., :1]
+    tests["ghost_y_pos"] = matching["ghost"][..., 1:2]
+    tests["missed_y_pos"] = matching["missed"][..., 1:2]
+    tests["ghost_x_energy"] = matching["ghost"][..., 2:3]
+    tests["missed_x_energy"] = matching["missed"][..., 2:3]
 
     return times, tests

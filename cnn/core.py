@@ -275,9 +275,7 @@ class CNNCore:
             obj_loss = tf.reduce_sum(obj_loss, axis=(1, 2, 3))
             class_loss = tf.reduce_sum(class_loss, axis=(1, 2, 3))
 
-            return (
-                xy_loss + obj_loss + wh_loss + class_loss
-            )  # + .25 * energy_loss  #+ 0.125 * class_loss
+            return xy_loss + obj_loss + wh_loss + class_loss + energy_loss
 
         return yolo_loss
 

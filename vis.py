@@ -51,8 +51,8 @@ def add_lhcb_like_label(label=None, exp="LHCb", **kwargs):
         ):
             kwargs.setdefault(key, value)
     kwargs.setdefault("italic", (False, False))
-    kwargs.setdefault("fontsize", 28)
-    # kwargs.setdefault("fontname", "Times New Roman")
+    kwargs.setdefault("fontsize", 20)
+    kwargs.setdefault("fontname", "Tex Gyre Termes")
     kwargs.setdefault("exp_weight", "bold")
     kwargs.setdefault("loc", 4)  # 4 top right, underneath the axis
     if label is not None:
@@ -107,6 +107,56 @@ def plot_scatter_plots(ax, data_tuple, data_labels, data_colors, **kwargs):
             label=data_label,
             color=data_color,
         )
+
+
+def plot_energy_resolution(
+    ax,
+    data_tuple,
+    data_labels,
+    data_colors,
+    min_energy=100.0,  # 100 MeV
+    max_energy=1e5,  # 100 GeV
+    bins=50,
+    log_scale=False,
+    **kwargs
+):
+    span = abs(max_energy - min_energy)
+    if span <= 1.0:
+        min_energy -= 10.0
+        max_energy += 10.0
+
+    if span > 1e3:
+        log_scale = True
+
+    energy_true = data_tuple[0]
+    energy_pred = data_tuple[1]
+    diff = energy_pred - energy_true
+    bin_size = (max_energy - min_energy) / bins
+    xbins = np.arange(min_energy, max_energy + bin_size, bin_size)
+    if log_scale:
+        xbins = np.logspace(np.log10(min_energy), np.log10(max_energy), num=bins)
+    xbinst = np.array([[xbins[i], xbins[i + 1]] for i in range(len(xbins[:-1]))])
+    ybins = np.array(
+        [
+            100.0
+            * np.mean(np.abs(diff[(energy_true > x[0]) & (energy_true <= x[1])]))
+            / np.mean(x)
+            for x in xbinst
+        ]
+    )
+    ybins_stddev = np.array(
+        [
+            100.0
+            * np.std(np.abs(diff[(energy_true > x[0]) & (energy_true <= x[1])]))
+            / np.mean(x)
+            for x in xbinst
+        ]
+    )
+    hep.histplot(ybins, xbins, histtype="errorbar", xerr=True, yerr=ybins_stddev, ax=ax)
+    if log_scale:
+        ax.set_xscale("log")
+    plt.ylabel(r"$\frac{\sigma}{E}$ [$\%$]")
+    plt.xlabel("Energy [MeV]")
 
 
 def plot_event(
