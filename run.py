@@ -37,10 +37,8 @@ def parse_options(args, parsed_start_time: str) -> CNNConfig:
                 overriden_text = "(MANUALLY OVERRIDEN)"
                 value = parsed_value
                 # FIXME: this looks tedious
-                if value == "True":
-                    value = True
-                if value == "False":
-                    value = False
+                if type(value) is str and set(["[", "]", "False", "True"]) & set(value):
+                    value = eval(value)
         if overriden_text or not args.config_file:
             log.debug(f"-> {prop}: {value} {overriden_text}")
             setattr(config, prop, value)
@@ -147,12 +145,14 @@ if __name__ == "__main__":
     )
 
     # optional, provide support for config options
-    for name, value in CNNConfig.OPTIONS.items():
+    for name, value in CNNConfig.CONFIGURABLE_OPTIONS.items():
         prop_type = type(value)
-        if prop_type in [int, str, list, float]:
+        if prop_type in [int, str, float]:
             parser.add_argument(f"--{name}", type=prop_type)
         elif prop_type is bool:
             parser.add_argument(f"--{name}", type=str, choices=["True", "False"])
+        elif prop_type is list:
+            parser.add_argument(f"--{name}", type=str)
             # parser.add_argument(f'--{name}', action='store_true')
             # parser.add_argument(f'--no-{name}', dest=name, action='store_false')
             # parser.set_defaults(feature=True)

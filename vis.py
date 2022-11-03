@@ -3,6 +3,8 @@ from matplotlib import pyplot as plt
 import mplhep as hep
 from mplhep import label as label_base
 from tests import ragged_to_normal
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay
 
 
 def find_axis_label(label):
@@ -51,9 +53,8 @@ def add_lhcb_like_label(label=None, exp="LHCb", **kwargs):
     kwargs.setdefault("italic", (False, False))
     kwargs.setdefault("fontsize", 28)
     # kwargs.setdefault("fontname", "Times New Roman")
-    kwargs.setdefault("exp_weight", "normal")
+    kwargs.setdefault("exp_weight", "bold")
     kwargs.setdefault("loc", 4)  # 4 top right, underneath the axis
-    kwargs.setdefault("exp_weight", "normal")
     if label is not None:
         kwargs["label"] = label
     return label_base.exp_label(exp, **kwargs)
@@ -133,3 +134,14 @@ def plot_event(
     cbar.set_label("Energy Deposited [MeV]")
     plot_shapes(ax, ys, color="blue", hatch="/")
     plot_shapes(ax, preds, color="red", hatch="\\")
+
+
+def plot_confusion_matrix(
+    ax,
+    data_tuple,
+    class_names,
+):
+    cm = confusion_matrix(
+        data_tuple[0], data_tuple[1], labels=list(range(len(class_names)))
+    )
+    ConfusionMatrixDisplay(cm, display_labels=class_names).plot(ax=ax)

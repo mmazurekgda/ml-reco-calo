@@ -14,6 +14,7 @@ from vis import (
     plot_histograms,
     plot_scatter_plots,
     plot_event,
+    plot_confusion_matrix,
     find_axis_label,
     add_lhcb_like_label,
 )
@@ -60,6 +61,74 @@ class CNNLoggingCallback(tf.keras.callbacks.Callback):
 
 
 class CNNTestingCallback(tf.keras.callbacks.Callback):
+    img_keys = {
+        "vs_particle_energy": {
+            "histo_keys": ["true_energy", "pred_energy"],
+            "data_labels": ["Truth", "Predicted"],
+            "data_colors": ["blue", "red"],
+        },
+        "vs_cluster_width": {
+            "histo_keys": ["true_width", "pred_width"],
+            "data_labels": ["Truth", "Predicted"],
+            "data_colors": ["blue", "red"],
+        },
+        "vs_cluster_height": {
+            "histo_keys": ["true_height", "pred_height"],
+            "data_labels": ["Truth", "Predicted"],
+            "data_colors": ["blue", "red"],
+        },
+        "vs_cluster_x_pos": {
+            "histo_keys": ["true_x_pos", "pred_x_pos"],
+            "data_labels": ["Truth", "Predicted"],
+            "data_colors": ["blue", "red"],
+        },
+        "vs_cluster_x_pos_extended": {
+            "histo_keys": [
+                "true_x_pos",
+                "pred_x_pos",
+                "matched_true_x_pos",
+                "matched_pred_x_pos",
+            ],
+            "data_labels": [
+                "Truth",
+                "Predicted",
+                "Matched Truth",
+                "Matched Predicted",
+            ],
+            "data_colors": [
+                "blue",
+                "red",
+                "cyan",
+                "orange",
+            ],
+        },
+        "vs_cluster_y_pos": {
+            "histo_keys": ["true_y_pos", "pred_y_pos"],
+            "data_labels": ["Truth", "Predicted"],
+            "data_colors": ["blue", "red"],
+        },
+        "vs_cluster_y_pos_extended": {
+            "histo_keys": [
+                "true_y_pos",
+                "pred_y_pos",
+                "matched_true_y_pos",
+                "matched_pred_y_pos",
+            ],
+            "data_labels": [
+                "Truth",
+                "Predicted",
+                "Matched Truth",
+                "Matched Predicted",
+            ],
+            "data_colors": [
+                "blue",
+                "red",
+                "cyan",
+                "orange",
+            ],
+        },
+    }
+
     def __init__(self, config, logger, dataset, image_transformation):
         super().__init__()
         self.log = logger
@@ -75,12 +144,25 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         self,
         name,
         data_tuple,
-        data_labels,
-        data_colors,
-        xlabel="",
-        ylabel="",
+        data_labels=[],
+        data_colors=[],
+        xlabel=None,
+        ylabel=None,
         plot_type="hist",
+        exp=None,
+        llabel=None,
+        rlabel=None,
+        loc=4,
+        title=None,
     ):
+        if title is None:
+            title = name
+        if not exp:
+            exp = self.config.testing_image_label_exp
+        if not llabel:
+            llabel = self.config.testing_image_label_llabel
+        if not rlabel:
+            rlabel = self.config.testing_image_label_rlabel
         plt.style.use(hep.style.LHCb2)
         fig, ax = plt.subplots(
             1,
@@ -91,10 +173,11 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             ),
         )
         add_lhcb_like_label(
-            exp=self.config.testing_image_label_exp,
-            llabel=self.config.testing_image_label_llabel,
-            rlabel=self.config.testing_image_label_rlabel,
             ax=ax,
+            exp=exp,
+            llabel=llabel,
+            rlabel=rlabel,
+            loc=loc,
         )
         if plot_type == "hist":
             plot_histograms(
@@ -125,13 +208,28 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 img_width=self.config.img_width,
                 img_height=self.config.img_height,
             )
+        elif plot_type == "confusion_matrix":
+            plot_confusion_matrix(
+                ax,
+                data_tuple,
+                self.config.classes,
+            )
         else:
             raise NotImplementedError()
 
-        plt.title(name)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.legend(loc=1)  # upper right
+        if title:
+            plt.title(title)
+        if xlabel is not None:
+            plt.xlabel(xlabel)
+        if ylabel is not None:
+            plt.ylabel(ylabel)
+        if plot_type in ["hist", "scatter"]:
+            hep.plot.hist_legend(ax=ax, loc=1)
+            # hep.plot.mpl_magic(ax=ax)
+            hep.plot.ylow(ax=ax)
+            hep.plot.yscale_legend(ax=ax)
+            ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[-1] * 1.15)
+            fig.canvas.draw()
         buf = io.BytesIO()
         plt.savefig(buf, format="png")
         plt.close(fig)
@@ -154,10 +252,10 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                     buckets=self.config.testing_image_histogram_buckets,
                 )
 
-    def _make_epoch_histogram_images(self, step, histo_data, img_keys):
+    def _make_epoch_histogram_images(self, step, histo_data):
         self.log.debug("-> Generating histogram images...")
         with self.histogram_writer.as_default():
-            for img_name, img_data in img_keys.items():
+            for img_name, img_data in self.img_keys.items():
                 name = getattr(self.config, f"on_epoch_histogram_image_{img_name}_name")
                 group = getattr(
                     self.config, f"on_epoch_histogram_image_{img_name}_group"
@@ -184,13 +282,26 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 image = self._make_image_from_plot(
                     f"{name}, Epoch: {step}",
                     [hits, ys, preds],
-                    [],  # empty for now, maybe later
-                    [],  # empty for now, maybe later
                     xlabel=f"X {getattr(self.config, find_axis_label('x_pos'))}",
                     ylabel=f"Y {getattr(self.config, find_axis_label('y_pos'))}",
                     plot_type="event",
                 )
                 tf.summary.image(full_name, image, step=step)
+
+    def _make_epoch_confusion_matrix(self, step, true_classes, pred_classes):
+        self.log.debug("-> Generating confusion matrices...")
+        with self.histogram_writer.as_default():
+            name = "Confusion Matrix"
+            group = "Classification"
+            full_name = " / ".join([group, name])
+            image = self._make_image_from_plot(
+                f"{name}, Epoch: {step}",
+                [true_classes, pred_classes],
+                plot_type="confusion_matrix",
+                title="",
+                loc=0,
+            )
+            tf.summary.image(full_name, image, step=step)
 
     def _make_epoch_performance_scalars(self, step, timings, data):
         self.log.debug("-> Generating performance & timing values/plots...")
@@ -226,74 +337,6 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 
         self._make_epoch_performance_scalars(epoch, times, tests)
 
-        img_keys = {
-            "vs_particle_energy": {
-                "histo_keys": ["true_energy", "pred_energy"],
-                "data_labels": ["Truth", "Predicted"],
-                "data_colors": ["blue", "red"],
-            },
-            "vs_cluster_width": {
-                "histo_keys": ["true_width", "pred_width"],
-                "data_labels": ["Truth", "Predicted"],
-                "data_colors": ["blue", "red"],
-            },
-            "vs_cluster_height": {
-                "histo_keys": ["true_height", "pred_height"],
-                "data_labels": ["Truth", "Predicted"],
-                "data_colors": ["blue", "red"],
-            },
-            "vs_cluster_x_pos": {
-                "histo_keys": ["true_x_pos", "pred_x_pos"],
-                "data_labels": ["Truth", "Predicted"],
-                "data_colors": ["blue", "red"],
-            },
-            "vs_cluster_x_pos_extended": {
-                "histo_keys": [
-                    "true_x_pos",
-                    "pred_x_pos",
-                    "matched_true_x_pos",
-                    "matched_pred_x_pos",
-                ],
-                "data_labels": [
-                    "Truth",
-                    "Predicted",
-                    "Matched Truth",
-                    "Matched Predicted",
-                ],
-                "data_colors": [
-                    "blue",
-                    "red",
-                    "cyan",
-                    "orange",
-                ],
-            },
-            "vs_cluster_y_pos": {
-                "histo_keys": ["true_y_pos", "pred_y_pos"],
-                "data_labels": ["Truth", "Predicted"],
-                "data_colors": ["blue", "red"],
-            },
-            "vs_cluster_y_pos_extended": {
-                "histo_keys": [
-                    "true_y_pos",
-                    "pred_y_pos",
-                    "matched_true_y_pos",
-                    "matched_pred_y_pos",
-                ],
-                "data_labels": [
-                    "Truth",
-                    "Predicted",
-                    "Matched Truth",
-                    "Matched Predicted",
-                ],
-                "data_colors": [
-                    "blue",
-                    "red",
-                    "cyan",
-                    "orange",
-                ],
-            },
-        }
-
         gallery_events = [
             np.squeeze(tests["images"][:10]),
             tests["true_position"][:10, ..., :4],
@@ -304,14 +347,23 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             "images",
             "true_position",
             "pred_position",
+            "true_classes",
+            "pred_classes",
+            "matched_true_classes",
+            "matched_pred_classes",
         ]
 
         histo_types = {k: v for k, v in tests.items() if k not in non_histo_types}
-
         for histo_type, histo_values in histo_types.items():
             histo_types[histo_type] = ragged_to_normal(histo_values.flatten())
 
+        self._make_epoch_confusion_matrix(
+            epoch,
+            ragged_to_normal(tests["matched_true_classes"].flatten()),
+            ragged_to_normal(tests["matched_pred_classes"].flatten()),
+        )
         self._make_epoch_histograms(epoch, histo_types)
-        self._make_epoch_histogram_images(epoch, histo_types, img_keys)
+        self._make_epoch_histogram_images(epoch, histo_types)
         self._make_epoch_histogram_events(epoch, gallery_events)
+
         self.log.debug(f"Done.")

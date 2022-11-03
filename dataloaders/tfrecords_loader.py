@@ -19,13 +19,13 @@ def dataloader():
         return (
             tf.reshape(parsed["image"], (config.img_width, config.img_height, 1)),
             tf.reshape(
-                parsed["annotations"], (parsed["objects_no"], config.features_no)
+                parsed["annotations"], (parsed["objects_no"], config.input_features_no)
             ),
         )
 
     def loader(config, stage="training"):
         files = config.tfrecords_files
-        if stage == "valdiation":
+        if stage == "validation":
             files = config.tfrecords_validation_files
         elif stage == "testing":
             files = config.tfrecords_test_files

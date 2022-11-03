@@ -264,17 +264,19 @@ class CNNCore:
             obj_loss = binary_crossentropy(true_obj, pred_obj)
             obj_loss = obj_mask * obj_loss + (1 - obj_mask) * ignore_mask * obj_loss
 
-            # class_loss = obj_mask * sparse_categorical_crossentropy(true_class_idx, pred_class)
+            class_loss = obj_mask * sparse_categorical_crossentropy(
+                true_class_idx, pred_class
+            )
 
             # 6. sum over (batch, gridx, gridy, anchors) => (batch, 1)
             xy_loss = tf.reduce_sum(xy_loss, axis=(1, 2, 3))
             wh_loss = tf.reduce_sum(wh_loss, axis=(1, 2, 3))
             energy_loss = tf.reduce_sum(energy_loss, axis=(1, 2, 3))
             obj_loss = tf.reduce_sum(obj_loss, axis=(1, 2, 3))
-            # class_loss = tf.reduce_sum(class_loss, axis=(1, 2, 3))
+            class_loss = tf.reduce_sum(class_loss, axis=(1, 2, 3))
 
             return (
-                0.25 * xy_loss + 0.25 * obj_loss + 0.25 * wh_loss
+                xy_loss + obj_loss + wh_loss + class_loss
             )  # + .25 * energy_loss  #+ 0.125 * class_loss
 
         return yolo_loss

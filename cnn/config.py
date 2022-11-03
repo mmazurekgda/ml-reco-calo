@@ -193,7 +193,7 @@ class Config:
     NON_CONFIGURABLE_OPTIONS = {
         "anchors": np.ndarray([]),
         "classes_no": 0,
-        "features_no": 0,
+        "input_features_no": 0,
     }
 
     OPTIONS = {
@@ -240,6 +240,16 @@ class Config:
                     self.log.warning(f"--> Setting an undefined property for {key}")
             self.log.debug(f"--> ({override_text}) '{key}': {new_value}")
         object.__setattr__(self, key, new_value)
+        if self._rigid:
+            self._check_for_non_configurables(key=key)
+
+    def _check_for_non_configurables(self, key="", all=False):
+        if all or key in ["anchors_not_parsed", "img_width", "img_height"]:
+            self.anchors = self.anchors_not_parsed / [self.img_width, self.img_height]
+        if all or key in ["classes"]:
+            self.classes_no = len(self.classes) if isinstance(self.classes, list) else 1
+        if all or key in ["energy_classes_no"]:
+            self.input_features_no = 4 + self.energy_cols_no + 1
 
     def __init__(self, output_area="./", load_config_file=None, freeze=False):
         self.log = logging.getLogger("MCRecoCalo")
@@ -260,11 +270,8 @@ class Config:
                         parsed_value = self._safe_object(prop, value)
                         setattr(self, prop, parsed_value)
         else:
+            self._check_for_non_configurables(all=True)
             self.log.warning("-> No config file given. Will use the default values.")
-        if not load_config_file:
-            self.anchors = self.anchors_not_parsed / [self.img_width, self.img_height]
-            self.classes_no = len(self.classes) if isinstance(self.classes, list) else 1
-            self.features_no = 4 + self.energy_cols_no + self.classes_no
         if freeze:
             self._freeze()
         self.check_compatibility()

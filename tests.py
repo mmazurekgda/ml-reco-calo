@@ -161,7 +161,7 @@ def prepare_dataset_for_inference(
     times = {}
     energies, true_energies = [], []
     positions, true_positions = [], []
-    scores = []
+    scores, classes, true_classes = [], [], []
 
     start_time = time.process_time()
     # dataset
@@ -206,9 +206,11 @@ def prepare_dataset_for_inference(
 
     for pred, y in zip(preds, ys):
         true_positions.append(y[..., 0:4].numpy())
-        true_energies.append(y[..., 5].numpy())
+        true_energies.append(y[..., 4].numpy())
+        true_classes.append(y[..., 5].numpy())
         energies.append(pred[1].numpy())
         positions.append(pred[0].numpy())
+        classes.append(np.argmax(pred[2].numpy(), axis=-1))
         scores.append(pred[3].numpy())
 
     tests = {
@@ -217,6 +219,8 @@ def prepare_dataset_for_inference(
         "score": np.array(scores, dtype=object),
         "pred_position": np.array(positions, dtype=object),
         "true_position": np.array(true_positions, dtype=object),
+        "true_classes": np.array(true_classes, dtype=object),
+        "pred_classes": np.array(classes, dtype=object),
         "images": np.array(xs),
     }
 
@@ -256,6 +260,7 @@ def prepare_dataset_for_inference(
             # additional
             tests["true_width"],
             tests["true_height"],
+            tests["true_classes"],
         ],
         axis=-1,
     )
@@ -267,6 +272,7 @@ def prepare_dataset_for_inference(
             # additional
             tests["pred_width"],
             tests["pred_height"],
+            tests["pred_classes"],
         ],
         axis=-1,
     )
@@ -292,5 +298,7 @@ def prepare_dataset_for_inference(
     tests["matched_pred_x_pos"] = matching["matched_pred"][..., :1]
     tests["matched_true_y_pos"] = matching["matched_true"][..., 1:2]
     tests["matched_pred_y_pos"] = matching["matched_pred"][..., 1:2]
+    tests["matched_true_classes"] = matching["matched_true"][..., 5:]
+    tests["matched_pred_classes"] = matching["matched_pred"][..., 5:]
 
     return times, tests
