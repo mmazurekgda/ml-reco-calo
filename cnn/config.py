@@ -71,9 +71,9 @@ class Config:
         "soft_nms_sigma": 0.0,
         "calibrate": True,
         "calibrate_measure": "f-score",
-        "calibrate_iou_threshold_values": [0.5],
-        "calibrate_score_threshold_values": [0.0, 0.5],
-        "calibrate_soft_nms_sigma_values": [0.0, 0.25, 0.5, 0.75],
+        "calibrate_iou_threshold_values": [0., .25, .5, .75, .9],
+        "calibrate_score_threshold_values": [0., .25, .5, .75, .9],
+        "calibrate_soft_nms_sigma_values": [0., 0.25, 0.5, 0.75, .9, 1.],
     }
 
     TEST_OPTIONS = {
