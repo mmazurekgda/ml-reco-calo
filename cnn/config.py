@@ -84,6 +84,7 @@ class Config:
         "testing_image_label_exp": "Gaussino",
         "testing_image_label_llabel": "Simulation Preliminary",
         "testing_image_label_rlabel": "",
+        "testing_image_label_rlabel_infrastructure": "",
         "testing_image_figure_x_size": 15,
         "testing_image_figure_y_size": 10,
         "testing_image_histogram_buckets": 100,

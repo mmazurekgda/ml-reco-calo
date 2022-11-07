@@ -192,6 +192,11 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             llabel = self.config.testing_image_label_llabel
         if not rlabel:
             rlabel = self.config.testing_image_label_rlabel
+            if self.config.testing_image_label_rlabel_infrastructure:
+                rlabel = " | ".join([
+                    rlabel,
+                    self.config.testing_image_label_rlabel_infrastructure,
+                ])
         plt.style.use(hep.style.LHCb2)
         fig, ax = plt.subplots(
             1,
