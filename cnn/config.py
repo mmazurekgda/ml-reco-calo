@@ -348,7 +348,7 @@ class Config:
         if hasattr(paths, "__iter__"):
             new_paths = []
             for path in paths:
-                new_path.append("/".join([directory, path]))
+                new_paths.append("/".join([directory, path]))
             return new_paths
 
     def _rigidify(self):
