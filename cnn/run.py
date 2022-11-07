@@ -21,7 +21,7 @@ from cnn.core import CNNCore
 from cnn.callbacks import (
     StopTrainingSignal,
     CNNLoggingCallback,
-    CNNTestingCallback,
+    CNNTestingAtTrainingCallback,
 )
 
 
@@ -128,7 +128,7 @@ class CNN(CNNCore):
             )
         if self.config.testing:
             callbacks.append(
-                CNNTestingCallback(
+                CNNTestingAtTrainingCallback(
                     self.config,
                     self.log,
                     self.test_dataset,

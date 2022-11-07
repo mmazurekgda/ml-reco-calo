@@ -9,11 +9,11 @@ from sklearn.metrics import ConfusionMatrixDisplay
 
 def find_axis_label(label):
     if "x_pos" in label or "y_pos" in label:
-        return "on_epoch_histogram_pos_label"
+        return "on_callback_histogram_pos_label"
     if "width" in label or "height" in label:
-        return "on_epoch_histogram_length_label"
+        return "on_callback_histogram_length_label"
     if "energy" in label:
-        return "on_epoch_histogram_energy_label"
+        return "on_callback_histogram_energy_label"
     return ""
 
 
@@ -51,7 +51,7 @@ def add_lhcb_like_label(label=None, exp="LHCb", **kwargs):
         ):
             kwargs.setdefault(key, value)
     kwargs.setdefault("italic", (False, False))
-    kwargs.setdefault("fontsize", 20)
+    kwargs.setdefault("fontsize", 24)
     kwargs.setdefault("fontname", "Tex Gyre Termes")
     kwargs.setdefault("exp_weight", "bold")
     kwargs.setdefault("loc", 4)  # 4 top right, underneath the axis

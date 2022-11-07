@@ -80,28 +80,36 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         "missed_x_energy",
     ]
 
+    data_types_names = {
+        "true_x_pos": "Truth",
+        "pred_x_pos": "Predicted",
+        "matched_pred_x_pos": "Matched",
+        "ghost_x_pos": "Ghost",
+        "missed_x_pos": "Missed",
+    }
+
     joint_histograms = {
-        "vs_particle_energy": {
+        "comparison_energy": {
             "histo_keys": ["true_energy", "pred_energy"],
             "data_labels": ["Truth", "Predicted"],
             "data_colors": ["blue", "red"],
         },
-        "vs_cluster_width": {
+        "comparison_cluster_width": {
             "histo_keys": ["true_width", "pred_width"],
             "data_labels": ["Truth", "Predicted"],
             "data_colors": ["blue", "red"],
         },
-        "vs_cluster_height": {
+        "comparison_cluster_height": {
             "histo_keys": ["true_height", "pred_height"],
             "data_labels": ["Truth", "Predicted"],
             "data_colors": ["blue", "red"],
         },
-        "vs_cluster_x_pos": {
+        "comparison_cluster_x_pos": {
             "histo_keys": ["true_x_pos", "pred_x_pos"],
             "data_labels": ["Truth", "Predicted"],
             "data_colors": ["blue", "red"],
         },
-        "vs_cluster_x_pos_extended": {
+        "comparison_cluster_x_pos_extended": {
             "histo_keys": [
                 "true_x_pos",
                 "pred_x_pos",
@@ -121,12 +129,12 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 "orange",
             ],
         },
-        "vs_cluster_y_pos": {
+        "comparison_cluster_y_pos": {
             "histo_keys": ["true_y_pos", "pred_y_pos"],
             "data_labels": ["Truth", "Predicted"],
             "data_colors": ["blue", "red"],
         },
-        "vs_cluster_y_pos_extended": {
+        "comparison_cluster_y_pos_extended": {
             "histo_keys": [
                 "true_y_pos",
                 "pred_y_pos",
@@ -275,13 +283,15 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         image = tf.expand_dims(image, 0)
         return image
 
-    def _make_epoch_histograms(self, step, histo_data):
+    def _make_histograms(self, step, histo_data):
         self.log.debug("-> Generating histograms...")
         with self.histogram_writer.as_default():
             for histo_type, histo_values in histo_data.items():
-                name = getattr(self.config, f"on_epoch_histogram_{histo_type}_name")
-                group = getattr(self.config, f"on_epoch_histogram_{histo_type}_group")
-                full_name = " / ".join([group, name])
+                name = getattr(self.config, f"on_callback_histogram_{histo_type}_name")
+                group = getattr(
+                    self.config, f"on_callback_histogram_{histo_type}_group"
+                )
+                full_name = " / ".join([f"{self.prefix} {group}", name])
                 tf.summary.histogram(
                     full_name,
                     histo_values,
@@ -289,17 +299,19 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                     buckets=self.config.testing_image_histogram_buckets,
                 )
 
-    def _make_epoch_histogram_images(self, step, histo_data):
+    def _make_histogram_images(self, step, step_name, histo_data):
         self.log.debug("-> Generating histogram images...")
         with self.histogram_writer.as_default():
             for img_name, img_data in self.joint_histograms.items():
-                name = getattr(self.config, f"on_epoch_histogram_image_{img_name}_name")
-                group = getattr(
-                    self.config, f"on_epoch_histogram_image_{img_name}_group"
+                name = getattr(
+                    self.config, f"on_callback_histogram_image_{img_name}_name"
                 )
-                full_name = " / ".join([group, name])
+                group = getattr(
+                    self.config, f"on_callback_histogram_image_{img_name}_group"
+                )
+                full_name = " / ".join([f"{self.prefix} {group}", name])
                 image = self._make_image_from_plot(
-                    f"{name}, Epoch: {step}",
+                    f"{name}, {step_name}",
                     [histo_data[key] for key in img_data["histo_keys"]],
                     img_data["data_labels"],
                     img_data["data_colors"],
@@ -309,14 +321,14 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 )
                 tf.summary.image(full_name, image, step=step)
 
-    def _make_epoch_energy_resolution(self, step, true_energy, pred_energy):
+    def _make_energy_resolution(self, step, step_name, true_energy, pred_energy):
         self.log.debug("-> Generating energy resolution image...")
         with self.histogram_writer.as_default():
-            name = self.config.on_epoch_image_energy_resolution_name
-            group = self.config.on_epoch_image_energy_resolution_group
-            full_name = " / ".join([group, name])
+            name = self.config.on_callback_image_energy_resolution_name
+            group = self.config.on_callback_image_energy_resolution_group
+            full_name = " / ".join([f"{self.prefix} {group}", name])
             image = self._make_image_from_plot(
-                f"{name}, Epoch: {step}",
+                f"{name}, {step_name}",
                 [true_energy, pred_energy],
                 xlabel="Energy [MeV]",
                 ylabel=r"$\sigma$ / E [$\%$]",
@@ -324,15 +336,15 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             )
             tf.summary.image(full_name, image, step=step)
 
-    def _make_epoch_histogram_events(self, step, tuples):
+    def _make_histogram_events(self, step, step_name, tuples):
         self.log.debug("-> Generating gallery of events...")
         with self.histogram_writer.as_default():
             for evt, (hits, ys, preds) in enumerate(zip(*tuples)):
                 name = f"Example {evt}"
                 group = "Gallery"
-                full_name = " / ".join([group, name])
+                full_name = " / ".join([f"{self.prefix} {group}", name])
                 image = self._make_image_from_plot(
-                    f"{name}, Epoch: {step}",
+                    f"{name}, {step_name}",
                     [hits, ys, preds],
                     xlabel=f"X {getattr(self.config, find_axis_label('x_pos'))}",
                     ylabel=f"Y {getattr(self.config, find_axis_label('y_pos'))}",
@@ -340,14 +352,14 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 )
                 tf.summary.image(full_name, image, step=step)
 
-    def _make_epoch_confusion_matrix(self, step, true_classes, pred_classes):
+    def _make_confusion_matrix(self, step, step_name, true_classes, pred_classes):
         self.log.debug("-> Generating confusion matrices...")
         with self.histogram_writer.as_default():
             name = "Confusion Matrix"
             group = "Classification"
-            full_name = " / ".join([group, name])
+            full_name = " / ".join([f"{self.prefix} {group}", name])
             image = self._make_image_from_plot(
-                f"{name}, Epoch: {step}",
+                f"{name}, {step_name}",
                 [true_classes, pred_classes],
                 plot_type="confusion_matrix",
                 title="",
@@ -356,19 +368,17 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             )
             tf.summary.image(full_name, image, step=step)
 
-    def _make_epoch_performance_scalars(self, step, timings, data):
+    def _make_performance_scalars(self, step, step_name):
         self.log.debug("-> Generating performance & timing values/plots...")
         with self.histogram_writer.as_default():
-            for timing_name, timing_value in timings.items():
-                time_per_event = timing_value / len(data["true_position"]) * 1000.0
+            for timing_name, time_per_event in self.timings.items():
                 tf.summary.scalar(
-                    f"Timing/{timing_name}",
-                    time_per_event,
+                    f"{self.prefix} Timing/{timing_name}",
+                    time_per_event[-1],
                     step=step,
                 )
-                self.timings[timing_name].append(time_per_event)
             image = self._make_image_from_plot(
-                f"Timing Summary, Epoch: {step}",
+                f"Timing Summary, {step_name}",
                 [[range(len(values)), values] for values in self.timings.values()],
                 self.timings.keys(),
                 ["b", "g", "r", "c", "m"],
@@ -376,71 +386,175 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                 ylabel="Time per event [ms]",
                 plot_type="scatter",
             )
-            tf.summary.image("Timing/Summary", image, step=step)
+            tf.summary.image(f"{self.prefix} Timing/Summary", image, step=step)
 
-            data_types_names = {
-                "true_x_pos": "Truth",
-                "pred_x_pos": "Predicted",
-                "matched_pred_x_pos": "Matched",
-                "ghost_x_pos": "Ghost",
-                "missed_x_pos": "Missed",
-            }
-            for data_type, data_name in data_types_names.items():
-                clusters_no_tmp = len(ragged_to_normal(data[data_type].flatten()))
-                self.log.debug(f"--> {data_name} Clusters No.: {clusters_no_tmp}")
+            for data_name, clusters_no in self.clusters_no.items():
                 tf.summary.scalar(
-                    f"Performance/{data_name}",
-                    clusters_no_tmp,
+                    f"{self.prefix} Performance/{data_name}",
+                    clusters_no[-1],
                     step=step,
                 )
-                self.clusters_no[data_type].append(clusters_no_tmp)
             image = self._make_image_from_plot(
-                f"Performance Summary, Epoch: {step}",
+                f"Performance Summary, {step_name}",
                 [[range(len(values)), values] for values in self.clusters_no.values()],
-                data_types_names.values(),
+                self.clusters_no.keys(),
                 ["b", "g", "r", "c", "m"],
                 xlabel="Epoch",
                 ylabel="Clusters No.",
                 plot_type="scatter",
             )
-            tf.summary.image("Performance/Summary", image, step=step)
+            tf.summary.image(f"{self.prefix} Performance/Summary", image, step=step)
 
-    def on_epoch_end(self, epoch, logs=None):
-        self.log.debug(f"Testing epoch {epoch} with {self.config.on_epoch_samples}.")
-        times, tests = prepare_dataset_for_inference(
-            self.config,
-            self.image_transformation,
-            self.model,
-            self.dataset,
-            self.config.on_epoch_samples,
-        )
-
-        self._make_epoch_performance_scalars(epoch, times, tests)
+    def _plot(self, step, step_name):
+        self._make_performance_scalars(step, step_name)
 
         gallery_events = [
-            np.squeeze(tests["images"][:10]),
-            tests["true_position"][:10, ..., :4],
-            tests["pred_position"][:10, ..., :4],
+            np.squeeze(self.tests["images"][:10]),
+            self.tests["true_position"][:10, ..., :4],
+            self.tests["pred_position"][:10, ..., :4],
         ]
 
         histo_types = {
-            k: v for k, v in tests.items() if k not in self.non_automatic_histo_types
+            k: v
+            for k, v in self.tests.items()
+            if k not in self.non_automatic_histo_types
         }
         for histo_type, histo_values in histo_types.items():
             histo_types[histo_type] = ragged_to_normal(histo_values.flatten())
 
-        self._make_epoch_confusion_matrix(
-            epoch,
-            ragged_to_normal(tests["matched_true_classes"].flatten()),
-            ragged_to_normal(tests["matched_pred_classes"].flatten()),
+        self._make_confusion_matrix(
+            step,
+            step_name,
+            ragged_to_normal(self.tests["matched_true_classes"].flatten()),
+            ragged_to_normal(self.tests["matched_pred_classes"].flatten()),
         )
-        self._make_epoch_histograms(epoch, histo_types)
-        self._make_epoch_energy_resolution(
-            epoch,
-            ragged_to_normal(tests["matched_true_energy"].flatten()),
-            ragged_to_normal(tests["matched_pred_energy"].flatten()),
+        self._make_histograms(step, histo_types)
+        self._make_histogram_images(step, step_name, histo_types)
+        self._make_energy_resolution(
+            step,
+            step_name,
+            ragged_to_normal(self.tests["matched_true_energy"].flatten()),
+            ragged_to_normal(self.tests["matched_pred_energy"].flatten()),
         )
-        self._make_epoch_histogram_images(epoch, histo_types)
-        self._make_epoch_histogram_events(epoch, gallery_events)
+        self._make_histogram_events(step, step_name, gallery_events)
 
         self.log.debug(f"Done.")
+
+    def _get_setup_performance(self, **kwargs):
+        self.log.info(f"-> Checking for \n'{kwargs}'")
+        self.config._unfreeze()
+        # -> set the options here
+        for option, value in kwargs.items():
+            setattr(self.config, option, value)
+        self.config._freeze()
+        self.times, self.tests = prepare_dataset_for_inference(
+            self.config,
+            self.image_transformation,
+            self.model,
+            self.dataset,
+            self.config.on_train_end_samples,
+        )
+        self._check_performance()
+
+    def _check_performance(self):
+        self.log.debug("--> Checking performance...")
+        longest_txt = max([len(key) for key in self.times.keys()])
+        for timing_name, timing_value in self.times.items():
+            time_per_event = timing_value / len(self.tests["true_position"]) * 1000.0
+            self.timings[timing_name].append(time_per_event)
+            msg = f"---> {timing_name} time:{' ' * (longest_txt - len(timing_name))} {round(timing_value, 3)} s,"
+            msg += f" {round(time_per_event, 3)} ms/event"
+            msg += f" {round(timing_value / self.times['Total'] * 100, 3)} % total time"
+            self.log.debug(msg)
+
+        for data_type, data_name in self.data_types_names.items():
+            clusters_no_tmp = len(ragged_to_normal(self.tests[data_type].flatten()))
+            self.log.debug(f"---> {data_name} Clusters No.: {clusters_no_tmp}")
+            self.clusters_no[data_name].append(clusters_no_tmp)
+
+    def _calibrate(self):
+        self.log.info("Calibration started...")
+        self.timings.clear()
+        self.clusters_no.clear()
+        tested_opts = []
+        for iou_th in self.config.calibrate_iou_threshold_values:
+            for score_th in self.config.calibrate_score_threshold_values:
+                for soft_nms_th in self.config.calibrate_soft_nms_sigma_values:
+                    opts = dict(
+                        iou_threshold=iou_th,
+                        score_threshold=score_th,
+                        soft_nms_sigma=soft_nms_th,
+                    )
+                    tested_opts.append(opts)
+                    self._get_setup_performance(**opts)
+        self.log.info("Maximizing over: '{self.config.calibrate_measure}'")
+        measure_values = {}
+        if self.config.calibrate_measure == "f-score":
+            measure_values = [
+                (
+                    opts,
+                    2
+                    * self.clusters_no["Matched"][i]
+                    / (
+                        2 * self.clusters_no["Matched"][i]
+                        + self.clusters_no["Ghost"][i]
+                        + self.clusters_no["Missed"][i]
+                    ),
+                )
+                for i, opts in enumerate(tested_opts)
+            ]
+            measure_values = sorted(measure_values, key=lambda x: x[1])
+            self.log.debug(f"-> F1 scores:")
+            for measure_value in measure_values:
+                self.log.debug(f"--> {measure_value[0]}: {measure_value[1]}")
+        else:
+            raise NotImplementedError()
+        best_options = measure_values[-1]
+        self.clusters_no.clear()
+        self.timings.clear()
+        self.log.info(f"-> Best option is: \n{best_options[0]}")
+        self.log.debug(f"-> Setting the best option for further inference.")
+        self.config._unfreeze()
+        for option, value in best_options[0].items():
+            setattr(self.config, option, value)
+        self.config._freeze()
+
+
+class CNNTestingAtTrainingCallback(CNNTestingCallback):
+    def on_epoch_end(self, epoch, logs=None):
+        self.prefix = "Monitoring"
+        samples = self.config.on_epoch_end_samples
+        samples_msg = f"{samples} samples"
+        if samples < 0:
+            samples_msg = " the whole testing dataset"
+        self.log.info(f"Monitoring of training for epoch {epoch} with {samples_msg}...")
+        self.times, self.tests = prepare_dataset_for_inference(
+            self.config,
+            self.image_transformation,
+            self.model,
+            self.dataset,
+            samples,
+        )
+        self._check_performance()
+        self._plot(epoch, f"Epoch: {epoch}")
+
+    def on_train_end(self, logs=None):
+        self.prefix = "Inference"
+        step_name = "Final Not Calibrated"
+        samples = self.config.on_train_end_samples
+        samples_msg = f"{samples} samples"
+        if samples < 0:
+            samples_msg = " the whole testing dataset"
+        self.log.info(f"Final inference with {samples_msg}...")
+        if self.config.calibrate:
+            step_name = "Final Calibrated"
+            self._calibrate()
+        self.times, self.tests = prepare_dataset_for_inference(
+            self.config,
+            self.image_transformation,
+            self.model,
+            self.dataset,
+            samples,
+        )
+        self._check_performance()
+        self._plot(0, step_name)

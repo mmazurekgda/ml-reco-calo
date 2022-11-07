@@ -197,13 +197,6 @@ def prepare_dataset_for_inference(
     times["NMS"] = time.process_time() - times["Inference"] - start_time
     times["Total"] = time.process_time() - start_time
 
-    longest_txt = max([len(key) for key in times.keys()])
-    for txt, seconds in times.items():
-        msg = f"--> {txt} time:{' ' * (longest_txt - len(txt))} {round(seconds, 3)} s,"
-        msg += f" {round(seconds * 1000 / len(xs), 3)} ms/event"
-        msg += f" {round(seconds / times['Total'] * 100, 3)} % total time"
-        config.log.debug(msg)
-
     for pred, y in zip(preds, ys):
         true_positions.append(y[..., 0:4].numpy())
         true_energies.append(y[..., 4].numpy())
@@ -223,6 +216,13 @@ def prepare_dataset_for_inference(
         "pred_classes": np.array(classes, dtype=object),
         "images": np.array(xs),
     }
+
+    if len(tests["pred_energy"].shape) == 1:
+        tests["pred_energy"].resize(tests["pred_energy"].shape[0], 0)
+    if len(tests["pred_position"].shape) == 1:
+        tests["pred_position"].resize(tests["pred_position"].shape[0], 0, 4)
+    if len(tests["pred_classes"].shape) == 1:
+        tests["pred_classes"].resize(tests["pred_classes"].shape[0], 0)
 
     convert_data(config, tests)
 
@@ -286,7 +286,13 @@ def prepare_dataset_for_inference(
             a = a.reshape((0, 3))
         if b.shape == (1, 0):
             b = b.reshape((0, 3))
-        ids = particle_matching(a[..., :3], b[..., :3])
+        ids = particle_matching(
+            a[..., :3],
+            b[..., :3],
+            # TODO: important!
+            # max_dist_diff =
+            # max_energy_diff =
+        )
         matching["matched_true"].append(a[ids["matched_true"].astype(int)])
         matching["missed"].append(a[ids["missed"].astype(int)])
         matching["matched_pred"].append(b[ids["matched_pred"].astype(int)])
