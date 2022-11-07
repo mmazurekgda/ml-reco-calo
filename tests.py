@@ -10,7 +10,6 @@ def ragged_to_normal(np_array):
         [elem for elem in np_array if not (type(elem) == np.ndarray and elem.size == 0)]
     )
 
-
 def convert_data(config, tests):
     tests["pred_energy"] = config.convert_to_energy(tests["pred_energy"])
     tests["true_energy"] = config.convert_to_energy(tests["true_energy"])
@@ -79,14 +78,14 @@ def particle_matching(
     banned_id_pairs = np.array([])
     # flag those relations with energy cost > max_energy_diff
     if max_energy_diff:
-        A_e = A[..., 2:3]
-        B_e = B[..., 2:3]
+        A_e = A[..., 2:3].astype(np.float32)
+        B_e = B[..., 2:3].astype(np.float32)
         if energy_in_log:
             if (A_e <= 0.0).any() or (B_e <= 0.0).any():
                 raise ValueError("Energy must be >= 0.")
             A_e = np.log10(A_e)
             B_e = np.log10(B_e)
-        cost_e = np.sqrt(get_cost_matrix(A_e, B_e, ndim=1))
+        cost_e = np.sqrt(get_cost_matrix(A_e, B_e, ndim=1).astype(np.float32))
         banned_id_pairs_e = np.argwhere(cost_e >= max_energy_diff)
         if not banned_id_pairs.any():
             banned_id_pairs = banned_id_pairs_e
@@ -100,8 +99,8 @@ def particle_matching(
 
     # flag those relations with distance > max_dist_diff
     if max_dist_diff:
-        A_d = A[..., 0:2]
-        B_d = B[..., 0:2]
+        A_d = A[..., 0:2].astype(np.float32)
+        B_d = B[..., 0:2].astype(np.float32)
         cost_d = np.sqrt(get_cost_matrix(A_d, B_d, ndim=2))
         banned_id_pairs_d = np.argwhere(cost_d >= max_dist_diff)
         if not banned_id_pairs.any():
@@ -289,9 +288,9 @@ def prepare_dataset_for_inference(
         ids = particle_matching(
             a[..., :3],
             b[..., :3],
-            # TODO: important!
-            # max_dist_diff =
-            # max_energy_diff =
+            max_dist_diff = 3 * abs(config.img_x_max - config.img_x_min) / config.img_width,
+            max_energy_diff = 1.,
+            energy_in_log=True,
         )
         matching["matched_true"].append(a[ids["matched_true"].astype(int)])
         matching["missed"].append(a[ids["missed"].astype(int)])
