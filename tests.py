@@ -6,27 +6,27 @@ from scipy.optimize import linear_sum_assignment
 
 
 def ragged_to_normal(np_array):
-    return np.array(
-        [elem for elem in np_array if not (type(elem) == np.ndarray and elem.size == 0)]
-    )
+    arr = []
+    if tf.is_tensor(np_array):
+        np_array = np_array.numpy()
+    for elem in np_array:
+        if not (type(elem) == np.ndarray and elem.size == 0):
+            if type(elem) == np.ndarray:
+                arr += elem.tolist()
+            else:
+                arr.append(elem)
+    return np.array(arr)
 
 
 def convert_data(config, tests):
     tests["pred_energy"] = config.convert_to_energy(tests["pred_energy"])
     tests["true_energy"] = config.convert_to_energy(tests["true_energy"])
     for position_type in ["pred_position", "true_position"]:
-        tests[position_type][..., 0] = config.convert_to_position(
-            tests[position_type][..., 0], dim="x"
-        )
-        tests[position_type][..., 2] = config.convert_to_position(
-            tests[position_type][..., 2], dim="x"
-        )
-        tests[position_type][..., 1] = config.convert_to_position(
-            tests[position_type][..., 1], dim="y"
-        )
-        tests[position_type][..., 3] = config.convert_to_position(
-            tests[position_type][..., 3], dim="y"
-        )
+        xmin = config.convert_to_position(tests[position_type][..., 0:1], dim="x")
+        ymin = config.convert_to_position(tests[position_type][..., 1:2], dim="y")
+        xmax = config.convert_to_position(tests[position_type][..., 2:3], dim="x")
+        ymax = config.convert_to_position(tests[position_type][..., 3:4], dim="y")
+        tests[position_type] = tf.concat([xmin, ymin, xmax, ymax], -1)
     tests["images"] = config.convert_to_hit_energy(tests["images"])
 
 
@@ -167,7 +167,6 @@ def prepare_dataset_for_inference(
     dataset,
     samples=100,
 ):
-
     times = {}
     energies, true_energies = [], []
     positions, true_positions = [], []
@@ -190,10 +189,15 @@ def prepare_dataset_for_inference(
 
     # inference on the whole dataset
     config.log.debug("-> Applying predict() on testing dataset..")
-    model.apply_refine = True
     raw_preds = model.predict(merged_xs, steps=len(xs))
     times["Inference"] = time.process_time() - times["Preprocessing"] - start_time
-    model.apply_refine = False
+
+    # FIXME: TF 2.0 handles the output a bit differently...
+    #        -> for some reason we do not get a tuple...
+    if type(raw_preds) is not tuple:
+        raw_preds = (raw_preds,)
+    #        -> remove it once its understood!
+    #        -> (breaking change)
 
     # nms
     config.log.debug("-> Applying NMS per event in the testing dataset..")
@@ -219,7 +223,7 @@ def prepare_dataset_for_inference(
         positions.append(pred[0].numpy())
         classes.append(np.argmax(pred[2].numpy(), axis=-1))
         scores.append(pred[3].numpy())
-
+    """
     tests = {
         "pred_energy": np.array(energies, dtype=object),
         "true_energy": np.array(true_energies, dtype=object),
@@ -230,14 +234,28 @@ def prepare_dataset_for_inference(
         "pred_classes": np.array(classes, dtype=object),
         "images": np.array(xs),
     }
-
-    for typ in ["pred_energy", "pred_classes", "score", "true_energy", "true_classes"]:
-        if len(tests[typ].shape) == 1:
-            tests[typ].resize(tests[typ].shape[0], 0, 1)
-        elif len(tests[typ].shape) == 2:
-            tests[typ].resize(tests[typ].shape[0], tests[typ].shape[1], 1)
-    if len(tests["pred_position"].shape) == 1:
-        tests["pred_position"].resize(tests["pred_position"].shape[0], 0, 4)
+    """
+    tests = {
+        # numpy does not support well ragged tensors
+        "pred_energy": tf.expand_dims(
+            tf.ragged.constant(energies, ragged_rank=1), axis=-1
+        ),
+        "true_energy": tf.expand_dims(
+            tf.ragged.constant(true_energies, ragged_rank=1), axis=-1
+        ),
+        "score": tf.expand_dims(tf.ragged.constant(scores, ragged_rank=1), axis=-1),
+        "pred_position": tf.ragged.constant(positions, ragged_rank=1),
+        "true_position": tf.ragged.constant(true_positions, ragged_rank=1),
+        "true_classes": tf.cast(
+            tf.expand_dims(tf.ragged.constant(true_classes, ragged_rank=1), axis=-1),
+            dtype=tf.float32,
+        ),
+        "pred_classes": tf.cast(
+            tf.expand_dims(tf.ragged.constant(classes, ragged_rank=1), axis=-1),
+            dtype=tf.float32,
+        ),
+        "images": np.array(xs),
+    }
 
     convert_data(config, tests)
 
@@ -268,7 +286,7 @@ def prepare_dataset_for_inference(
 
     config.log.debug("-> Looking for matched clusters..")
 
-    truth_for_matching = np.concatenate(
+    truth_for_matching = tf.concat(
         [
             tests["true_x_pos"],
             tests["true_y_pos"],
@@ -280,7 +298,7 @@ def prepare_dataset_for_inference(
         ],
         axis=-1,
     )
-    pred_for_matching = np.concatenate(
+    pred_for_matching = tf.concat(
         [
             tests["pred_x_pos"],
             tests["pred_y_pos"],
@@ -293,7 +311,7 @@ def prepare_dataset_for_inference(
         axis=-1,
     )
     matching = defaultdict(list)
-    for a, b in zip(truth_for_matching, pred_for_matching):
+    for a, b in zip(truth_for_matching.numpy(), pred_for_matching.numpy()):
         if len(a.shape) == 1:
             a = np.expand_dims(a, axis=0)
         if len(b.shape) == 1:
@@ -332,5 +350,8 @@ def prepare_dataset_for_inference(
     tests["missed_y_pos"] = matching["missed"][..., 1:2]
     tests["ghost_x_energy"] = matching["ghost"][..., 2:3]
     tests["missed_x_energy"] = matching["missed"][..., 2:3]
+    # for name in tests.keys():
+    #     if tf.is_tensor(tests[name]):
+    #         tests[name] = tests[name].numpy()
 
     return times, tests

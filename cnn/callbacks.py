@@ -417,8 +417,8 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 
         gallery_events = [
             np.squeeze(self.tests["images"][:10]),
-            self.tests["true_position"][:10, ..., :4],
-            self.tests["pred_position"][:10, ..., :4],
+            self.tests["true_position"][:10, ..., :4].numpy(),
+            self.tests["pred_position"][:10, ..., :4].numpy(),
         ]
 
         histo_types = {
@@ -427,7 +427,11 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             if k not in self.non_automatic_histo_types
         }
         for histo_type, histo_values in histo_types.items():
-            histo_types[histo_type] = ragged_to_normal(histo_values.flatten())
+            tmp = histo_values
+            if tf.is_tensor(tmp):
+                tmp = tmp.numpy()
+            # FIXME: for some reason 2 flatten needed...
+            histo_types[histo_type] = ragged_to_normal(tmp.flatten()).flatten()
 
         self._make_confusion_matrix(
             step,
@@ -467,7 +471,9 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         self.log.debug("--> Checking performance...")
         longest_txt = max([len(key) for key in self.times.keys()])
         for timing_name, timing_value in self.times.items():
-            time_per_event = timing_value / len(self.tests["true_position"]) * 1000.0
+            time_per_event = (
+                timing_value / self.tests["true_position"].shape[0] * 1000.0
+            )
             self.timings[timing_name].append(time_per_event)
             msg = f"---> {timing_name} time:{' ' * (longest_txt - len(timing_name))} {round(timing_value, 3)} s,"
             msg += f" {round(time_per_event, 3)} ms/event"
@@ -475,7 +481,10 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             self.log.debug(msg)
 
         for data_type, data_name in self.data_types_names.items():
-            clusters_no_tmp = len(ragged_to_normal(self.tests[data_type].flatten()))
+            tmp = self.tests[data_type]
+            if tf.is_tensor(tmp):
+                tmp = tmp.numpy()
+            clusters_no_tmp = len(ragged_to_normal(tmp.flatten()))
             self.log.debug(f"---> {data_name} Clusters No.: {clusters_no_tmp}")
             self.clusters_no[data_name].append(clusters_no_tmp)
 
