@@ -37,8 +37,11 @@ def parse_options(args, parsed_start_time: str) -> CNNConfig:
                 overriden_text = "(MANUALLY OVERRIDEN)"
                 value = parsed_value
                 # FIXME: this looks tedious
-                if type(value) is str and set(["[", "]", "False", "True"]) & set(value):
-                    value = eval(value)
+                if type(value) is str:
+                    if value.strip()[0] == "[":
+                        value = list(eval(value))
+                    if value in ["False", "True"]:
+                        value = bool(eval(value))
         if overriden_text or not args.config_file:
             log.debug(f"-> {prop}: {value} {overriden_text}")
             setattr(config, prop, value)
