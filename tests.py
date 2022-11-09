@@ -177,6 +177,7 @@ def prepare_dataset_for_inference(
     model,
     dataset,
     samples=100,
+    dev_no=1,
 ):
     times = {}
     energies, true_energies = [], []
@@ -198,9 +199,10 @@ def prepare_dataset_for_inference(
     merged_xs = image_transformation(merged_xs)
     times["Preprocessing"] = time.process_time() - times["Dataset Reading"] - start_time
 
-    # inference on the whole dataset
+    # INFERENCE
     config.log.debug("-> Applying predict() on testing dataset..")
-    raw_preds = model.predict(merged_xs, steps=len(xs))
+    # note that this is compatible with MirroredStrategy!
+    raw_preds = model.predict(merged_xs, steps=len(xs) // dev_no)
     times["Inference"] = time.process_time() - times["Preprocessing"] - start_time
 
     # FIXME: TF 2.0 handles the output a bit differently...

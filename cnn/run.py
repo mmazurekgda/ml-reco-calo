@@ -133,6 +133,7 @@ class CNN(CNNCore):
                     self.log,
                     self.test_dataset,
                     self.transform_images,
+                    dev_no=no_devices,
                 )
             )
 

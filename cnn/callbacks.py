@@ -156,12 +156,13 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         },
     }
 
-    def __init__(self, config, logger, dataset, image_transformation):
+    def __init__(self, config, logger, dataset, image_transformation, dev_no=1):
         super().__init__()
         self.log = logger
         self.config = config
         self.dataset = dataset
         self.image_transformation = image_transformation
+        self.dev_no = dev_no
         self.histogram_writer = tf.summary.create_file_writer(
             f"{self.config.tensorboard_log_dir}/testing_during_training"
         )
@@ -447,7 +448,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 
         self.log.debug(f"Done.")
 
-    def _get_setup_performance(self, **kwargs):
+    def _get_setup_performance(self, samples, **kwargs):
         self.log.info(f"-> Checking for \n'{kwargs}'")
         self.config._unfreeze()
         # -> set the options here
@@ -459,7 +460,8 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             self.image_transformation,
             self.model,
             self.dataset,
-            self.config.on_train_end_samples,
+            samples,
+            self.dev_no,
         )
         self._check_performance()
 
@@ -481,7 +483,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             self.log.debug(f"---> {data_name} Clusters No.: {clusters_no_tmp}")
             self.clusters_no[data_name].append(clusters_no_tmp)
 
-    def _calibrate(self):
+    def _calibrate(self, samples):
         self.log.info("Calibration started...")
         self.timings.clear()
         self.clusters_no.clear()
@@ -495,7 +497,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                         soft_nms_sigma=soft_nms_th,
                     )
                     tested_opts.append(opts)
-                    self._get_setup_performance(**opts)
+                    self._get_setup_performance(samples, **opts)
         self.log.info("Maximizing over: '{self.config.calibrate_measure}'")
         measure_values = {}
         if self.config.calibrate_measure == "f-score":
@@ -543,6 +545,7 @@ class CNNTestingAtTrainingCallback(CNNTestingCallback):
             self.model,
             self.dataset,
             samples,
+            self.dev_no,
         )
         self._check_performance()
         self._plot(epoch, f"Epoch: {epoch}")
@@ -557,13 +560,14 @@ class CNNTestingAtTrainingCallback(CNNTestingCallback):
         self.log.info(f"Final inference with {samples_msg}...")
         if self.config.calibrate:
             step_name = "Final Calibrated"
-            self._calibrate()
+            self._calibrate(samples)
         self.times, self.tests = prepare_dataset_for_inference(
             self.config,
             self.image_transformation,
             self.model,
             self.dataset,
             samples,
+            self.dev_no,
         )
         self._check_performance()
         self._plot(0, step_name)
