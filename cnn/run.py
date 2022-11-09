@@ -42,9 +42,9 @@ class CNN(CNNCore):
 
         if not dataloader:
             self.log.error("-> Dataloader not specified")
-        self.dataloader = dataloader(config)
-        self.val_dataloader = dataloader(config, stage="validation")
-        self.test_dataloader = dataloader(config, stage="testing")
+        self.dataloader = dataloader(config).dataset
+        self.val_dataloader = dataloader(config, stage="validation").dataset
+        self.test_dataloader = dataloader(config, stage="testing").dataset
 
         # Load data
         dataset = self.dataloader

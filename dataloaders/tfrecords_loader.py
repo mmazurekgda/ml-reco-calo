@@ -2,8 +2,8 @@ import tensorflow as tf
 import os
 
 
-def dataloader():
-    def decode(dataset, config):
+class DataLoader():
+    def decode(self, dataset):
         parsed = tf.io.parse_single_example(
             dataset,
             {
@@ -17,25 +17,23 @@ def dataloader():
             },
         )
         return (
-            tf.reshape(parsed["image"], (config.img_width, config.img_height, 1)),
+            tf.reshape(parsed["image"], (self.config.img_width, self.config.img_height, 1)),
             tf.reshape(
-                parsed["annotations"], (parsed["objects_no"], config.input_features_no)
+                parsed["annotations"], (parsed["objects_no"], self.config.input_features_no)
             ),
         )
 
-    def loader(config, stage="training"):
-        files = config.tfrecords_files
+    def __init__(self, config, stage="training"):
+        self.config = config
+        files = self.config.tfrecords_files
         if stage == "validation":
-            files = config.tfrecords_validation_files
+            files = self.config.tfrecords_validation_files
         elif stage == "testing":
-            files = config.tfrecords_test_files
-        files = config.paths_to_global(files)
-        dataset = tf.data.TFRecordDataset(
+            files = self.config.tfrecords_test_files
+        files = self.config.paths_to_global(files)
+        self.dataset = tf.data.TFRecordDataset(
             files,
-            buffer_size=config.tfrecords_buffer_size,
+            buffer_size=self.config.tfrecords_buffer_size,
             num_parallel_reads=os.cpu_count(),
-            compression_type=config.tfrecords_compression_type,  # "GZIP", "ZLIB", or ""
-        ).map(lambda x: decode(x, config))
-        return dataset
-
-    return loader
+            compression_type=self.config.tfrecords_compression_type,  # "GZIP", "ZLIB", or ""
+        ).map(self.decode)

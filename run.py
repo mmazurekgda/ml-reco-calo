@@ -71,7 +71,7 @@ def dataloader_lookup(dataloader_name):
     loaders_location = "dataloaders"
     this_loader_location = ".".join([loaders_location, dataloader_name])
     try:
-        dataloader = getattr(import_module(this_loader_location), "dataloader")
+        dataloader = getattr(import_module(this_loader_location), "DataLoader")
         log.debug(f"-> Imported '{dataloader_name}' from '{loaders_location}'.")
     except AttributeError:
         log.error("-> No dataloader() definition in your file!")
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     from cnn.run import CNN
 
     framework = CNN(
-        dataloader=dataloader(),
+        dataloader=dataloader,
         model=model,
         config=config,
     )
