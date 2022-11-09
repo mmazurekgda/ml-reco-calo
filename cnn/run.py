@@ -143,9 +143,6 @@ class CNN(CNNCore):
             self.log.debug(f"-> Loading weights from: {paths}")
             self.model.load_weights(paths)
 
-        input_shape = [self.config.batch_size, None, None, self.config.channels]
-        # self.model(tf.ones(shape=input_shape))
-        self.model.build(input_shape)
         self.model.summary(print_fn=lambda x: self.log.debug(x))
 
         self.log.debug("-> Adding the optimizer.")
