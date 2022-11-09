@@ -10,6 +10,7 @@ def ragged_to_normal(np_array):
         [elem for elem in np_array if not (type(elem) == np.ndarray and elem.size == 0)]
     )
 
+
 def convert_data(config, tests):
     tests["pred_energy"] = config.convert_to_energy(tests["pred_energy"])
     tests["true_energy"] = config.convert_to_energy(tests["true_energy"])
@@ -84,8 +85,8 @@ def particle_matching(
             # workaround: now some values in the predicted array might be <= 0
             # we set this to some small epsilon, so that if it is relatively far away
             # from the true values, which must be > 0 (energy)
-            A_e[A_e <= 0.] = 1e-30
-            B_e[B_e <= 0.] = 1e-30
+            A_e[A_e <= 0.0] = 1e-30
+            B_e[B_e <= 0.0] = 1e-30
             # if (A_e <= 0.0).any() or (B_e <= 0.0).any():
             #     raise ValueError("Energy must be >= 0.")
             A_e = np.log10(A_e)
@@ -123,7 +124,7 @@ def particle_matching(
         # mark banned links as very costy
         cost[banned_id_pairs.T[0], banned_id_pairs.T[1]] = np.inf
     row_cols = np.array([])
-    row_cols.resize(2,0)
+    row_cols.resize(2, 0)
     try:
         row_cols = linear_sum_assignment_with_inf(cost)
     except ValueError:
@@ -203,13 +204,12 @@ def prepare_dataset_for_inference(
             boxes_xs.append(
                 config.refine_boxes(
                     np.expand_dims(output_x[i], axis=0),
-                    config.anchors[config.anchor_masks[i]]
+                    config.anchors[config.anchor_masks[i]],
                 )[:4]
             )
         preds.append(config.nms(boxes_xs))
     times["NMS"] = time.process_time() - times["Inference"] - start_time
     times["Total"] = time.process_time() - start_time
-
 
     for pred, y in zip(preds, ys):
         true_positions.append(y[..., 0:4].numpy())
@@ -305,8 +305,10 @@ def prepare_dataset_for_inference(
         ids = particle_matching(
             a[..., :3],
             b[..., :3],
-            max_dist_diff = 3 * abs(config.img_x_max - config.img_x_min) / config.img_width,
-            max_energy_diff = 1.,
+            max_dist_diff=3
+            * abs(config.img_x_max - config.img_x_min)
+            / config.img_width,
+            max_energy_diff=1.0,
             energy_in_log=True,
         )
         matching["matched_true"].append(a[ids["matched_true"].astype(int)])

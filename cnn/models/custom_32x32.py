@@ -27,7 +27,8 @@ def SimpleConv(x, filters, kernel_size, batch_norm=True, **kwargs):
         x = LeakyReLU(alpha=0.1)(x)
     return x
 
-class Model():
+
+class Model:
     def __init__(self, config):
         self.config = config
         self.apply_refine = False
@@ -78,7 +79,7 @@ class Model():
                 ),
             )
         )(x)
-        '''
+        """
         if not training or self.apply_refine or self.apply_nms:
             boxes_0 = Lambda(
                 lambda x: self.config.refine_boxes(x, self.config.anchors[self.config.anchor_masks[0]]),
@@ -89,7 +90,7 @@ class Model():
             else:
                 outputs = Lambda(lambda x: self.config.nms(x), name="yolo_nms")((boxes_0[:4],))
                 return tf.keras.Model(inputs, outputs, name="simple_model")
-        '''
+        """
         return tf.keras.Model(inputs, (output_0,), name="simple")
 
     def __getattr__(self, name):

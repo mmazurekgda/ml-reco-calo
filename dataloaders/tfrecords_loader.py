@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 
 
-class DataLoader():
+class DataLoader:
     def decode(self, dataset):
         parsed = tf.io.parse_single_example(
             dataset,
@@ -17,9 +17,12 @@ class DataLoader():
             },
         )
         return (
-            tf.reshape(parsed["image"], (self.config.img_width, self.config.img_height, 1)),
             tf.reshape(
-                parsed["annotations"], (parsed["objects_no"], self.config.input_features_no)
+                parsed["image"], (self.config.img_width, self.config.img_height, 1)
+            ),
+            tf.reshape(
+                parsed["annotations"],
+                (parsed["objects_no"], self.config.input_features_no),
             ),
         )
 
