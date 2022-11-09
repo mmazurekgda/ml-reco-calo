@@ -122,7 +122,12 @@ def particle_matching(
     if banned_id_pairs.any():
         # mark banned links as very costy
         cost[banned_id_pairs.T[0], banned_id_pairs.T[1]] = np.inf
-    row_cols = linear_sum_assignment_with_inf(cost)
+    row_cols = np.array([])
+    row_cols.resize(2,0)
+    try:
+        row_cols = linear_sum_assignment_with_inf(cost)
+    except ValueError:
+        pass
     id_pairs = np.array(row_cols).T
 
     # identify unmatched predicted particles
