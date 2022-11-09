@@ -81,8 +81,13 @@ def particle_matching(
         A_e = A[..., 2:3].astype(np.float32)
         B_e = B[..., 2:3].astype(np.float32)
         if energy_in_log:
-            if (A_e <= 0.0).any() or (B_e <= 0.0).any():
-                raise ValueError("Energy must be >= 0.")
+            # workaround: now some values in the predicted array might be <= 0
+            # we set this to some small epsilon, so that if it is relatively far away
+            # from the true values, which must be > 0 (energy)
+            A_e[A_e <= 0.] = 1e-30
+            B_e[B_e <= 0.] = 1e-30
+            # if (A_e <= 0.0).any() or (B_e <= 0.0).any():
+            #     raise ValueError("Energy must be >= 0.")
             A_e = np.log10(A_e)
             B_e = np.log10(B_e)
         cost_e = np.sqrt(get_cost_matrix(A_e, B_e, ndim=1).astype(np.float32))
