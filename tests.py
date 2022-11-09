@@ -197,14 +197,19 @@ def prepare_dataset_for_inference(
     # nms
     config.log.debug("-> Applying NMS per event in the testing dataset..")
     preds = []
-    for event in range(len(xs)):
-        pre_nms = [
-            [pred[0][event], pred[1][event], pred[2][event], pred[3][event]]
-            for pred in raw_preds
-        ]
-        preds.append(model.nms(pre_nms))
+    for event_id, output_x in enumerate(zip(raw_preds[0])):
+        boxes_xs = []
+        for i in range(len(config.anchor_masks)):
+            boxes_xs.append(
+                config.refine_boxes(
+                    np.expand_dims(output_x[i], axis=0),
+                    config.anchors[config.anchor_masks[i]]
+                )[:4]
+            )
+        preds.append(config.nms(boxes_xs))
     times["NMS"] = time.process_time() - times["Inference"] - start_time
     times["Total"] = time.process_time() - start_time
+
 
     for pred, y in zip(preds, ys):
         true_positions.append(y[..., 0:4].numpy())
@@ -226,41 +231,43 @@ def prepare_dataset_for_inference(
         "images": np.array(xs),
     }
 
-    if len(tests["pred_energy"].shape) == 1:
-        tests["pred_energy"].resize(tests["pred_energy"].shape[0], 0)
+    for typ in ["pred_energy", "pred_classes", "score", "true_energy", "true_classes"]:
+        if len(tests[typ].shape) == 1:
+            tests[typ].resize(tests[typ].shape[0], 0, 1)
+        elif len(tests[typ].shape) == 2:
+            tests[typ].resize(tests[typ].shape[0], tests[typ].shape[1], 1)
     if len(tests["pred_position"].shape) == 1:
         tests["pred_position"].resize(tests["pred_position"].shape[0], 0, 4)
-    if len(tests["pred_classes"].shape) == 1:
-        tests["pred_classes"].resize(tests["pred_classes"].shape[0], 0)
 
     convert_data(config, tests)
 
     tests["true_width"] = (
-        tests["true_position"][..., 2] - tests["true_position"][..., 0]
+        tests["true_position"][..., 2:3] - tests["true_position"][..., 0:1]
     )
     tests["pred_width"] = (
-        tests["pred_position"][..., 2] - tests["pred_position"][..., 0]
+        tests["pred_position"][..., 2:3] - tests["pred_position"][..., 0:1]
     )
     tests["true_height"] = (
-        tests["true_position"][..., 3] - tests["true_position"][..., 1]
+        tests["true_position"][..., 3:4] - tests["true_position"][..., 1:2]
     )
     tests["pred_height"] = (
-        tests["pred_position"][..., 3] - tests["pred_position"][..., 1]
+        tests["pred_position"][..., 3:4] - tests["pred_position"][..., 1:2]
     )
     tests["true_x_pos"] = (
-        tests["true_position"][..., 2] + tests["true_position"][..., 0] / 2.0
+        tests["true_position"][..., 2:3] + tests["true_position"][..., 0:1] / 2.0
     )
     tests["pred_x_pos"] = (
-        tests["pred_position"][..., 2] + tests["pred_position"][..., 0] / 2.0
+        tests["pred_position"][..., 2:3] + tests["pred_position"][..., 0:1] / 2.0
     )
     tests["true_y_pos"] = (
-        tests["true_position"][..., 3] + tests["true_position"][..., 1] / 2.0
+        tests["true_position"][..., 3:4] + tests["true_position"][..., 1:2] / 2.0
     )
     tests["pred_y_pos"] = (
-        tests["pred_position"][..., 3] + tests["pred_position"][..., 1] / 2.0
+        tests["pred_position"][..., 3:4] + tests["pred_position"][..., 1:2] / 2.0
     )
 
     config.log.debug("-> Looking for matched clusters..")
+
     truth_for_matching = np.concatenate(
         [
             tests["true_x_pos"],
@@ -308,7 +315,7 @@ def prepare_dataset_for_inference(
         matching["ghost"].append(b[ids["ghost"].astype(int)])
 
     for key in matching.keys():
-        matching[key] = np.concatenate(matching[key])
+        matching[key] = np.concatenate(matching[key], axis=0)
     tests["matched_true_x_pos"] = matching["matched_true"][..., :1]
     tests["matched_pred_x_pos"] = matching["matched_pred"][..., :1]
     tests["matched_true_y_pos"] = matching["matched_true"][..., 1:2]
