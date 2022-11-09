@@ -23,13 +23,13 @@ else
     if [[ $HOSTNAME == *"gpu"* ]]
     then
         echo "--> using options for GPUs"
-        conda create -y --name calo_nn --file $MLRECOCALO_REPO_DIR/requirements_gpu_ncbj.txt
+        conda create -y --name calo_nn --file $MLRECOCALO_REPO_DIR/environment_gpu_ncbj.txt
     else
         echo "--> using options for CPUs"
-        conda create -y --name calo_nn --file $MLRECOCALO_REPO_DIR/requirements_cpu_ncbj.txt
+        conda create -y --name calo_nn --file $MLRECOCALO_REPO_DIR/environment_cpu_ncbj.txt
     fi
     conda activate calo_nn
-    pip install pyfiglet GitPython
+    pip install pyfiglet GitPython mplhep scikit-learn scipy
     #cp -r ~/miniconda3 /scratch/miniconda3
     #echo "~/miniconda3 copied to /scratch/miniconda3"
     echo "-> Done!"

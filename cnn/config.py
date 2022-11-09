@@ -283,7 +283,6 @@ class Config:
             self.log.warning("-> No config file given. Will use the default values.")
         if freeze:
             self._freeze()
-        self.check_compatibility()
 
     def _set_working_area(self):
         repo = git.Repo(".", search_parent_directories=True)
@@ -400,6 +399,25 @@ class Config:
             self._freeze()
 
     def check_compatibility(self):
+        wasfrozen = self._frozen
+        if self.on_epoch_end_samples == -1:
+            self.log.warning(
+                "On_epoch_end_samples unspecified. Setting to test_samples."
+            )
+            if wasfrozen:
+                self._unfreeze()
+            self.on_epoch_end_samples = self.test_samples
+            if wasfrozen:
+                self._freeze()
+        if self.on_train_end_samples == -1:
+            self.log.warning(
+                "On_train_end_samples unspecified. Setting to test_samples."
+            )
+            if wasfrozen:
+                self._unfreeze()
+            self.on_train_end_samples = self.test_samples
+            if wasfrozen:
+                self._freeze()
         msg = ""
         if not self.convert_energy in ["normalize", "standardize"]:
             msg = "You can either normalize or standardize energies"

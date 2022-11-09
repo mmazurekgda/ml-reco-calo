@@ -181,6 +181,8 @@ if __name__ == "__main__":
         model=model,
         config=config,
     )
+    # check some conflicting options
+    config.check_compatibility()
 
     log.debug("Dumping the config file...")
     config.dump_to_file()

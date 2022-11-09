@@ -532,8 +532,8 @@ class CNNTestingAtTrainingCallback(CNNTestingCallback):
         self.prefix = "Monitoring"
         samples = self.config.on_epoch_end_samples
         samples_msg = f"{samples} samples"
-        if samples < 0:
-            samples_msg = " the whole testing dataset"
+        if samples == self.config.test_samples:
+            samples_msg = " (the whole testing dataset)"
         self.log.info(f"Monitoring of training for epoch {epoch} with {samples_msg}...")
         self.times, self.tests = prepare_dataset_for_inference(
             self.config,
@@ -550,8 +550,8 @@ class CNNTestingAtTrainingCallback(CNNTestingCallback):
         step_name = "Final Not Calibrated"
         samples = self.config.on_train_end_samples
         samples_msg = f"{samples} samples"
-        if samples < 0:
-            samples_msg = " the whole testing dataset"
+        if samples == self.config.test_samples:
+            samples_msg += " (the whole testing dataset)"
         self.log.info(f"Final inference with {samples_msg}...")
         if self.config.calibrate:
             step_name = "Final Calibrated"
