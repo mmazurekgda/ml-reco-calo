@@ -5,17 +5,24 @@ import tensorflow as tf
 from scipy.optimize import linear_sum_assignment
 
 
-def ragged_to_normal(np_array):
-    arr = []
-    if tf.is_tensor(np_array):
-        np_array = np_array.numpy()
-    for elem in np_array:
-        if not (type(elem) == np.ndarray and elem.size == 0):
-            if type(elem) == np.ndarray:
-                arr += elem.tolist()
-            else:
-                arr.append(elem)
-    return np.array(arr)
+def flatten(S):
+    if S == []:
+        return S
+    if isinstance(S[0], list):
+        return flatten(S[0]) + flatten(S[1:])
+    return S[:1] + flatten(S[1:])
+
+
+def ragged_to_normal(array):
+    if tf.is_tensor(array):
+        return array.numpy()
+    elif isinstance(array, tf.RaggedTensor):
+        # TF 2.0 RaggedTensor does not support .numpy()
+        return np.array(flatten(array.to_list()))
+    elif isinstance(array, np.ndarray):
+        return array.flatten()
+    else:
+        raise NotImplementedError()
 
 
 def convert_data(config, tests):
@@ -26,7 +33,11 @@ def convert_data(config, tests):
         ymin = config.convert_to_position(tests[position_type][..., 1:2], dim="y")
         xmax = config.convert_to_position(tests[position_type][..., 2:3], dim="x")
         ymax = config.convert_to_position(tests[position_type][..., 3:4], dim="y")
-        tests[position_type] = tf.concat([xmin, ymin, xmax, ymax], -1)
+        if isinstance(tests[position_type], tf.RaggedTensor):
+            tests[position_type] = tf.concat([xmin, ymin, xmax, ymax], -1)
+        else:
+            tests[position_type] = np.concatenate([xmin, ymin, xmax, ymax], -1)
+
     tests["images"] = config.convert_to_hit_energy(tests["images"])
 
 
@@ -216,13 +227,13 @@ def prepare_dataset_for_inference(
     times["Total"] = time.process_time() - start_time
 
     for pred, y in zip(preds, ys):
-        true_positions.append(y[..., 0:4].numpy())
-        true_energies.append(y[..., 4].numpy())
-        true_classes.append(y[..., 5].numpy())
-        energies.append(pred[1].numpy())
-        positions.append(pred[0].numpy())
-        classes.append(np.argmax(pred[2].numpy(), axis=-1))
-        scores.append(pred[3].numpy())
+        true_positions.append(y[..., 0:4].numpy().tolist())
+        true_energies.append(y[..., 4].numpy().tolist())
+        true_classes.append(y[..., 5].numpy().tolist())
+        energies.append(pred[1].numpy().tolist())
+        positions.append(pred[0].numpy().tolist())
+        classes.append(np.argmax(pred[2].numpy(), axis=-1).tolist())
+        scores.append(pred[3].numpy().tolist())
     """
     tests = {
         "pred_energy": np.array(energies, dtype=object),
@@ -237,25 +248,43 @@ def prepare_dataset_for_inference(
     """
     tests = {
         # numpy does not support well ragged tensors
-        "pred_energy": tf.expand_dims(
-            tf.ragged.constant(energies, ragged_rank=1), axis=-1
-        ),
-        "true_energy": tf.expand_dims(
-            tf.ragged.constant(true_energies, ragged_rank=1), axis=-1
-        ),
         "score": tf.expand_dims(tf.ragged.constant(scores, ragged_rank=1), axis=-1),
-        "pred_position": tf.ragged.constant(positions, ragged_rank=1),
-        "true_position": tf.ragged.constant(true_positions, ragged_rank=1),
-        "true_classes": tf.cast(
-            tf.expand_dims(tf.ragged.constant(true_classes, ragged_rank=1), axis=-1),
-            dtype=tf.float32,
-        ),
-        "pred_classes": tf.cast(
-            tf.expand_dims(tf.ragged.constant(classes, ragged_rank=1), axis=-1),
-            dtype=tf.float32,
-        ),
         "images": np.array(xs),
     }
+
+    tests["pred_position"] = np.array(positions, dtype=object)
+    if len(tests["pred_position"].shape) == 2:
+        tests["pred_position"].resize(tests["pred_position"].shape[0], 0, 4)
+        tests["pred_energy"] = np.array(energies, dtype=object)
+        tests["pred_energy"].resize(tests["pred_energy"].shape[0], 0, 1)
+        tests["pred_classes"] = np.array(classes, dtype=object)
+        tests["pred_classes"].resize(tests["pred_energy"].shape[0], 0, 1)
+    else:
+        tests["pred_position"] = tf.ragged.constant(positions, ragged_rank=1)
+        tests["pred_energy"] = tf.expand_dims(
+            tf.ragged.constant(energies, ragged_rank=1), axis=-1
+        )
+        tests["pred_classes"] = tf.cast(
+            tf.expand_dims(tf.ragged.constant(classes, ragged_rank=1), axis=-1),
+            dtype=tf.float32,
+        )
+
+    tests["true_position"] = np.array(true_positions, dtype=object)
+    if len(tests["true_position"].shape) == 2:
+        tests["true_position"].resize(tests["true_position"].shape[0], 0, 4)
+        tests["true_energy"] = np.array(true_energies, dtype=object)
+        tests["true_energy"].resize(tests["true__energy"].shape[0], 0, 1)
+        tests["true_classes"] = np.array(true_classes, dtype=object)
+        tests["true_classes"].resize(tests["true_energy"].shape[0], 0, 1)
+    else:
+        tests["true_position"] = tf.ragged.constant(true_positions, ragged_rank=1)
+        tests["true_energy"] = tf.expand_dims(
+            tf.ragged.constant(true_energies, ragged_rank=1), axis=-1
+        )
+        tests["true_classes"] = tf.cast(
+            tf.expand_dims(tf.ragged.constant(true_classes, ragged_rank=1), axis=-1),
+            dtype=tf.float32,
+        )
 
     convert_data(config, tests)
 
@@ -285,33 +314,44 @@ def prepare_dataset_for_inference(
     )
 
     config.log.debug("-> Looking for matched clusters..")
+    truth_for_matching = [
+        tests["true_x_pos"],
+        tests["true_y_pos"],
+        tests["true_energy"],
+        # additional
+        tests["true_width"],
+        tests["true_height"],
+        tests["true_classes"],
+    ]
+    if isinstance(truth_for_matching[0], tf.RaggedTensor):
+        truth_for_matching = tf.concat(truth_for_matching, axis=-1).to_list()
+    else:
+        truth_for_matching = np.concatenate(truth_for_matching, axis=-1)
 
-    truth_for_matching = tf.concat(
-        [
-            tests["true_x_pos"],
-            tests["true_y_pos"],
-            tests["true_energy"],
-            # additional
-            tests["true_width"],
-            tests["true_height"],
-            tests["true_classes"],
-        ],
-        axis=-1,
-    )
-    pred_for_matching = tf.concat(
-        [
-            tests["pred_x_pos"],
-            tests["pred_y_pos"],
-            tests["pred_energy"],
-            # additional
-            tests["pred_width"],
-            tests["pred_height"],
-            tests["pred_classes"],
-        ],
-        axis=-1,
-    )
+    pred_for_matching = [
+        tests["pred_x_pos"],
+        tests["pred_y_pos"],
+        tests["pred_energy"],
+        # additional
+        tests["pred_width"],
+        tests["pred_height"],
+        tests["pred_classes"],
+    ]
+    if isinstance(pred_for_matching[0], tf.RaggedTensor):
+        pred_for_matching = tf.concat(pred_for_matching, axis=-1).to_list()
+    else:
+        pred_for_matching = np.concatenate(pred_for_matching, axis=-1)
+
     matching = defaultdict(list)
-    for a, b in zip(truth_for_matching.numpy(), pred_for_matching.numpy()):
+
+    for a, b in zip(
+        truth_for_matching,
+        pred_for_matching,
+    ):
+        if isinstance(a, list):
+            a = np.array(a)
+        if isinstance(b, list):
+            b = np.array(b)
         if len(a.shape) == 1:
             a = np.expand_dims(a, axis=0)
         if len(b.shape) == 1:

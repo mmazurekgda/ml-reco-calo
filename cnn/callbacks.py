@@ -417,8 +417,8 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 
         gallery_events = [
             np.squeeze(self.tests["images"][:10]),
-            self.tests["true_position"][:10, ..., :4].numpy(),
-            self.tests["pred_position"][:10, ..., :4].numpy(),
+            self.tests["true_position"][:10, ..., :4],
+            self.tests["pred_position"][:10, ..., :4],
         ]
 
         histo_types = {
@@ -427,25 +427,21 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             if k not in self.non_automatic_histo_types
         }
         for histo_type, histo_values in histo_types.items():
-            tmp = histo_values
-            if tf.is_tensor(tmp):
-                tmp = tmp.numpy()
-            # FIXME: for some reason 2 flatten needed...
-            histo_types[histo_type] = ragged_to_normal(tmp.flatten()).flatten()
+            histo_types[histo_type] = ragged_to_normal(histo_values)
 
         self._make_confusion_matrix(
             step,
             step_name,
-            ragged_to_normal(self.tests["matched_true_classes"].flatten()),
-            ragged_to_normal(self.tests["matched_pred_classes"].flatten()),
+            ragged_to_normal(self.tests["matched_true_classes"]),
+            ragged_to_normal(self.tests["matched_pred_classes"]),
         )
         self._make_histograms(step, histo_types)
         self._make_histogram_images(step, step_name, histo_types)
         self._make_energy_resolution(
             step,
             step_name,
-            ragged_to_normal(self.tests["matched_true_energy"].flatten()),
-            ragged_to_normal(self.tests["matched_pred_energy"].flatten()),
+            ragged_to_normal(self.tests["matched_true_energy"]),
+            ragged_to_normal(self.tests["matched_pred_energy"]),
         )
         self._make_histogram_events(step, step_name, gallery_events)
 
@@ -481,10 +477,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             self.log.debug(msg)
 
         for data_type, data_name in self.data_types_names.items():
-            tmp = self.tests[data_type]
-            if tf.is_tensor(tmp):
-                tmp = tmp.numpy()
-            clusters_no_tmp = len(ragged_to_normal(tmp.flatten()))
+            clusters_no_tmp = len(ragged_to_normal(self.tests[data_type]))
             self.log.debug(f"---> {data_name} Clusters No.: {clusters_no_tmp}")
             self.clusters_no[data_name].append(clusters_no_tmp)
 
