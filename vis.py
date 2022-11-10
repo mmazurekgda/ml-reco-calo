@@ -24,12 +24,18 @@ def prepare_dimension_columns(dim_min, steps, cell_size):
     return dim_cols
 
 
+def ensure_array(elem):
+    if isinstance(elem, (list, np.ndarray)):
+        return elem
+    return [elem]
+
+
 def plot_shapes(ax, ys, **kwargs):
     for min_x, max_x, min_y, max_y in zip(
-        ragged_to_normal(ys[:, 0]).tolist(),
-        ragged_to_normal(ys[:, 2]).tolist(),
-        ragged_to_normal(ys[:, 1]).tolist(),
-        ragged_to_normal(ys[:, 3]).tolist(),
+        ensure_array(ragged_to_normal(ys[:, 0]).tolist()),
+        ensure_array(ragged_to_normal(ys[:, 2]).tolist()),
+        ensure_array(ragged_to_normal(ys[:, 1]).tolist()),
+        ensure_array(ragged_to_normal(ys[:, 3]).tolist()),
     ):
         ax.add_artist(
             plt.Rectangle(

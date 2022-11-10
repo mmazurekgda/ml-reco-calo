@@ -6,24 +6,28 @@ from scipy.optimize import linear_sum_assignment
 
 
 def flatten(S):
-    if S == []:
+    if len(S) == 0:
         return S
-    if isinstance(S[0], list):
-        return flatten(S[0]) + flatten(S[1:])
-    elif isinstance(S[0], np.ndarray):
-        return S[0].flatten().tolist() + flatten(S[1:])
-    return S[:1] + flatten(S[1:])
+    arr = []
+    for elem in S:
+        if isinstance(elem, list):
+            arr += np.array(elem).flatten().tolist()
+        elif isinstance(elem, np.ndarray):
+            arr += elem.flatten().tolist()
+        else:
+            arr.append(elem)
+    return np.array(arr)
 
 
 def ragged_to_normal(array):
     # FIXME: this is a bit redundant, but ragged data is tricky...
     if tf.is_tensor(array):
-        return np.array(flatten(array.numpy().tolist()))
+        return flatten(array.numpy())
     elif isinstance(array, tf.RaggedTensor):
         # TF 2.0 RaggedTensor does not support .numpy()
-        return np.array(flatten(array.to_list()))
+        return flatten(array.to_list())
     elif isinstance(array, np.ndarray):
-        return np.array(flatten(array.tolist()))
+        return flatten(array)
     else:
         raise NotImplementedError()
 
