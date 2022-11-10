@@ -31,11 +31,13 @@ class CNN(CNNCore):
         model=None,
         dataloader=None,
         config=None,
+        dev_no=1,
     ):
         super().__init__(
             config=config,
         )
 
+        self.dev_no = dev_no
         if not model:
             self.log.error("-> Model not specified")
         self.model = model  # (config)
@@ -47,12 +49,12 @@ class CNN(CNNCore):
         self.test_dataloader = dataloader(config, stage="testing").dataset
 
         # Load data
-        dataset = self.dataloader
+        dataset = self.dataloader.take(self.config.samples)
         self.dataset = self.parse_dataset(dataset)
-        val_dataset = self.val_dataloader
+        val_dataset = self.val_dataloader.take(self.config.validation_samples)
         self.val_dataset = self.parse_dataset(val_dataset)
-        # FIXME: idiotic!
-        self.test_dataset = self.test_dataloader
+        self.raw_test_dataset = self.test_dataloader.take(self.config.test_samples)
+        self.test_dataset = self.parse_dataset(self.raw_test_dataset)
 
     def transform_dataset(self, x, y):
         return (self.transform_images(x), self.transform_targets(y))
@@ -62,19 +64,19 @@ class CNN(CNNCore):
             self.transform_dataset,
             num_parallel_calls=tf.data.experimental.AUTOTUNE,
         )
-        dataset = dataset.batch(self.config.batch_size, drop_remainder=True)
+        dataset = dataset.batch(self.config.batch_size * self.dev_no)
         dataset = dataset.prefetch(
             buffer_size=tf.data.experimental.AUTOTUNE,
         )
         if self.config.dataset_cache:
             dataset = dataset.cache()
         # if self.config.shuffle:
-        #    dataset = dataset.shuffle()
-        if self.config.dataset_repeat:
-            dataset = dataset.repeat()
+        #     dataset = dataset.shuffle()
+        # if self.config.dataset_repeat:
+        #      dataset = dataset.repeat()
         return dataset
 
-    def train(self, no_devices=1):
+    def train(self):
         self.log.info("-> Preparing the training procedure...")
 
         # Callbacks
@@ -132,8 +134,8 @@ class CNN(CNNCore):
                     self.config,
                     self.log,
                     self.test_dataset,
-                    self.transform_images,
-                    dev_no=no_devices,
+                    self.raw_test_dataset,
+                    dev_no=self.dev_no,
                 )
             )
 
@@ -160,14 +162,14 @@ class CNN(CNNCore):
                 epochs=self.config.epochs,
                 validation_data=self.val_dataset,
                 # TF 2.0: needed to avoid errors at the end of loop
-                steps_per_epoch=self.config.samples
-                // self.config.batch_size
-                // no_devices,
+                # steps_per_epoch=self.config.samples
+                # // self.config.batch_size
+                # // no_devices,
                 # validation_data=vs,
                 # TF 2.0: needed to avoid errors at the end of loop
-                validation_steps=self.config.validation_samples
-                // self.config.batch_size
-                // no_devices,
+                # validation_steps=self.config.validation_samples
+                # // self.config.batch_size
+                # // no_devices,
                 callbacks=callbacks,
             )
         except StopTrainingSignal:

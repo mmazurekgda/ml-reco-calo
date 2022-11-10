@@ -178,39 +178,25 @@ def particle_matching(
     }
 
 
-def prepare_dataset_for_inference(
+def inference(
     config,
-    image_transformation,
     model,
     dataset,
-    samples=100,
+    xs,
+    ys,
     dev_no=1,
 ):
     times = {}
     energies, true_energies = [], []
     positions, true_positions = [], []
     scores, classes, true_classes = [], [], []
-
     start_time = time.process_time()
-    # dataset
-    config.log.debug("-> Fetching testing dataset..")
-    xs, ys = [], []
-    for x, y in dataset.take(samples) if samples > 0 else dataset:
-        xs.append(np.expand_dims(x, 0))
-        ys.append(y)
-    times["Dataset Reading"] = time.process_time() - start_time
-
-    # preprocessing
-    config.log.debug("-> Preprocessing testing dataset..")
-    merged_xs = np.concatenate(xs, 0)
-    merged_xs = image_transformation(merged_xs)
-    times["Preprocessing"] = time.process_time() - times["Dataset Reading"] - start_time
 
     # INFERENCE
     config.log.debug("-> Applying predict() on testing dataset..")
     # note that this is compatible with MirroredStrategy!
-    raw_preds = model.predict(merged_xs, steps=len(xs) // dev_no)
-    times["Inference"] = time.process_time() - times["Preprocessing"] - start_time
+    raw_preds = model.predict(dataset)
+    times["Inference"] = time.process_time() - start_time
 
     # FIXME: TF 2.0 handles the output a bit differently...
     #        -> for some reason we do not get a tuple...
@@ -243,18 +229,7 @@ def prepare_dataset_for_inference(
         positions.append(pred[0].numpy().tolist())
         classes.append(np.argmax(pred[2].numpy(), axis=-1).tolist())
         scores.append(pred[3].numpy().tolist())
-    """
-    tests = {
-        "pred_energy": np.array(energies, dtype=object),
-        "true_energy": np.array(true_energies, dtype=object),
-        "score": np.array(scores, dtype=object),
-        "pred_position": np.array(positions, dtype=object),
-        "true_position": np.array(true_positions, dtype=object),
-        "true_classes": np.array(true_classes, dtype=object),
-        "pred_classes": np.array(classes, dtype=object),
-        "images": np.array(xs),
-    }
-    """
+
     tests = {
         # numpy does not support well ragged tensors
         "score": tf.expand_dims(tf.ragged.constant(scores, ragged_rank=1), axis=-1),

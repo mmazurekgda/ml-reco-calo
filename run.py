@@ -175,11 +175,17 @@ if __name__ == "__main__":
 
     log.info("Instantiating the framework...")
     from cnn.run import CNN
+    import tensorflow as tf  # FIXME: import here, but already added before
+
+    dev_no = 1
+    if args.mirrored_strategy:
+        dev_no = len(tf.config.experimental.list_physical_devices("GPU"))
 
     framework = CNN(
         dataloader=dataloader,
         model=model,
         config=config,
+        dev_no=dev_no,
     )
     # check some conflicting options
     config.check_compatibility()
@@ -190,11 +196,8 @@ if __name__ == "__main__":
     if args.training:
         log.info("The chosen main action is: TRAINING")
         if args.mirrored_strategy:
-            import tensorflow as tf  # FIXME: import here, but already added before
-
             with tf.distribute.MirroredStrategy().scope():
-                no_gpus = len(tf.config.experimental.list_physical_devices("GPU"))
-                framework.train(no_devices=no_gpus)
+                framework.train()
         else:
             framework.train()
     else:

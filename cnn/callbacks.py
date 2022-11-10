@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from tests import (
-    prepare_dataset_for_inference,
+    inference,
     convert_data,
     ragged_to_normal,
 )
@@ -156,18 +156,24 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         },
     }
 
-    def __init__(self, config, logger, dataset, image_transformation, dev_no=1):
+    def __init__(self, config, logger, dataset, raw_dataset, dev_no=1):
         super().__init__()
         self.log = logger
         self.config = config
         self.dataset = dataset
-        self.image_transformation = image_transformation
+        self.raw_dataset = raw_dataset
         self.dev_no = dev_no
         self.histogram_writer = tf.summary.create_file_writer(
             f"{self.config.tensorboard_log_dir}/testing_during_training"
         )
         self.timings = defaultdict(list)
         self.clusters_no = defaultdict(list)
+        config.log.debug("-> Fetching testing dataset for further analysis..")
+        self.xs = []
+        self.ys = []
+        for x, y in raw_dataset:
+            self.xs.append(np.expand_dims(x, 0))
+            self.ys.append(y)
 
     def _make_image_from_plot(
         self,
@@ -448,19 +454,19 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 
         self.log.debug(f"Done.")
 
-    def _get_setup_performance(self, samples, **kwargs):
+    def _get_setup_performance(self, **kwargs):
         self.log.info(f"-> Checking for \n'{kwargs}'")
         self.config._unfreeze()
         # -> set the options here
         for option, value in kwargs.items():
             setattr(self.config, option, value)
         self.config._freeze()
-        self.times, self.tests = prepare_dataset_for_inference(
+        self.times, self.tests = inference(
             self.config,
-            self.image_transformation,
             self.model,
             self.dataset,
-            samples,
+            self.xs,
+            self.ys,
             self.dev_no,
         )
         self._check_performance()
@@ -483,7 +489,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             self.log.debug(f"---> {data_name} Clusters No.: {clusters_no_tmp}")
             self.clusters_no[data_name].append(clusters_no_tmp)
 
-    def _calibrate(self, samples):
+    def _calibrate(self):
         self.log.info("Calibration started...")
         self.timings.clear()
         self.clusters_no.clear()
@@ -497,7 +503,7 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
                         soft_nms_sigma=soft_nms_th,
                     )
                     tested_opts.append(opts)
-                    self._get_setup_performance(samples, **opts)
+                    self._get_setup_performance(**opts)
         self.log.info("Maximizing over: '{self.config.calibrate_measure}'")
         measure_values = {}
         if self.config.calibrate_measure == "f-score":
@@ -534,17 +540,16 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 class CNNTestingAtTrainingCallback(CNNTestingCallback):
     def on_epoch_end(self, epoch, logs=None):
         self.prefix = "Monitoring"
-        samples = self.config.on_epoch_end_samples
-        samples_msg = f"{samples} samples"
-        if samples == self.config.test_samples:
-            samples_msg = " (the whole testing dataset)"
-        self.log.info(f"Monitoring of training for epoch {epoch} with {samples_msg}...")
-        self.times, self.tests = prepare_dataset_for_inference(
+        samples = self.config.test_samples
+        self.log.info(
+            f"Monitoring of training for epoch {epoch} with {samples} samples..."
+        )
+        self.times, self.tests = inference(
             self.config,
-            self.image_transformation,
             self.model,
             self.dataset,
-            samples,
+            self.xs,
+            self.ys,
             self.dev_no,
         )
         self._check_performance()
@@ -553,20 +558,17 @@ class CNNTestingAtTrainingCallback(CNNTestingCallback):
     def on_train_end(self, logs=None):
         self.prefix = "Inference"
         step_name = "Final Not Calibrated"
-        samples = self.config.on_train_end_samples
-        samples_msg = f"{samples} samples"
-        if samples == self.config.test_samples:
-            samples_msg += " (the whole testing dataset)"
-        self.log.info(f"Final inference with {samples_msg}...")
+        samples = self.config.test_samples
+        self.log.info(f"Final inference with {samples} samples...")
         if self.config.calibrate:
             step_name = "Final Calibrated"
-            self._calibrate(samples)
-        self.times, self.tests = prepare_dataset_for_inference(
+            self._calibrate()
+        self.times, self.tests = inference(
             self.config,
-            self.image_transformation,
             self.model,
             self.dataset,
-            samples,
+            self.xs,
+            self.ys,
             self.dev_no,
         )
         self._check_performance()

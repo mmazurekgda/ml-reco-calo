@@ -17,8 +17,8 @@ class Config:
         "test_samples": -1,
         # 'validation_split': .2,
         "iou_ignore": 0.5,
-        "dataset_cache": False,
-        "dataset_repeat": True,
+        "dataset_cache": True,
+        # "dataset_repeat": True,
         # 'shuffle_buffer_size': = 1000  # None = do not shuffle
         # early stopping
         "early_stopping": True,
@@ -78,8 +78,6 @@ class Config:
 
     TEST_OPTIONS = {
         "testing": True,
-        "on_epoch_end_samples": -1,
-        "on_train_end_samples": -1,
         # general labels
         "testing_image_label_exp": "Gaussino",
         "testing_image_label_llabel": "Simulation Preliminary",
@@ -399,32 +397,9 @@ class Config:
             self._freeze()
 
     def check_compatibility(self):
-        wasfrozen = self._frozen
-        if self.on_epoch_end_samples == -1:
-            self.log.warning(
-                "On_epoch_end_samples unspecified. Setting to test_samples."
-            )
-            if wasfrozen:
-                self._unfreeze()
-            self.on_epoch_end_samples = self.test_samples
-            if wasfrozen:
-                self._freeze()
-        if self.on_train_end_samples == -1:
-            self.log.warning(
-                "On_train_end_samples unspecified. Setting to test_samples."
-            )
-            if wasfrozen:
-                self._unfreeze()
-            self.on_train_end_samples = self.test_samples
-            if wasfrozen:
-                self._freeze()
         msg = ""
         if not self.convert_energy in ["normalize", "standardize"]:
             msg = "You can either normalize or standardize energies"
-        elif self.on_epoch_end_samples > self.test_samples:
-            msg = "On epoch samples must be < test samples"
-        elif self.on_train_end_samples > self.test_samples:
-            msg = "On train samples must be < test samples"
         if msg:
             self.log.error(msg)
             raise ValueError(msg)
