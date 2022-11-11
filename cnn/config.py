@@ -49,7 +49,7 @@ class Config:
         "tensorboard_embeddings_freq": 1,
         "tensorboard_embeddings_metadata": None,
         # other
-        "load_weight_path": None,
+        "load_weight_path": "",
     }
 
     TFRECORDS_DATALOADER = {
@@ -322,7 +322,7 @@ class Config:
     def ensure_local_path(self, option, path):
         local_path = ""
         if os.path.isabs(path):
-            if not os.path.exists(path):
+            if not os.path.exists(path) and option != "load_weight_path":
                 msg = f"-> The '{option}' has an invalid path. The file '{path}' does not exist."
                 self.log.error(msg)
                 raise FileNotFoundError(msg)

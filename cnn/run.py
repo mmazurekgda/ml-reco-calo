@@ -142,7 +142,7 @@ class CNN(CNNCore):
         self.model = self.model(self.config)
 
         if self.config.load_weight_path:
-            paths = self.config.paths_to_global(paths)
+            paths = self.config.paths_to_global(self.config.load_weight_path)
             self.log.debug(f"-> Loading weights from: {paths}")
             self.model.load_weights(paths)
 

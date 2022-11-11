@@ -341,9 +341,9 @@ def inference(
         if len(b.shape) == 1:
             b = np.expand_dims(b, axis=0)
         if a.shape == (1, 0):
-            a = a.reshape((0, 3))
+            a = a.reshape((0, 6))
         if b.shape == (1, 0):
-            b = b.reshape((0, 3))
+            b = b.reshape((0, 6))
         ids = particle_matching(
             a[..., :3],
             b[..., :3],

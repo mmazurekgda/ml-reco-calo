@@ -433,8 +433,18 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
             for k, v in self.tests.items()
             if k not in self.non_automatic_histo_types
         }
+        empty_keys = []
         for histo_type, histo_values in histo_types.items():
             histo_types[histo_type] = ragged_to_normal(histo_values)
+            if len(histo_types[histo_type]) == 0:
+                empty_keys.append(histo_type)
+
+        if "pred_energy" in empty_keys:
+            self.log.warning("Empty predictions. Skipping the plots... ")
+            return
+        if "true_energy" in empty_keys:
+            self.log.warning("Empty truth. Skipping the plots... ")
+            return
 
         self._make_confusion_matrix(
             step,

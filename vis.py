@@ -197,6 +197,8 @@ def plot_confusion_matrix(
     data_tuple,
     class_names,
 ):
+    if len(data_tuple[0]) == len(data_tuple[1]) == 0:
+        return
     cm = confusion_matrix(
         data_tuple[0], data_tuple[1], labels=list(range(len(class_names)))
     )
