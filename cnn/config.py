@@ -22,7 +22,8 @@ class Config:
         # 'shuffle_buffer_size': = 1000  # None = do not shuffle
         # early stopping
         "early_stopping": True,
-        "early_stopping_patience": 6,
+        "early_stopping_patience": 30,
+        "early_stopping_min_delta": 1e-6,
         "early_stopping_verbosity": 1,
         "early_stopping_restore": True,
         # reduce lr

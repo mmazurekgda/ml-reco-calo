@@ -99,6 +99,7 @@ class CNN(CNNCore):
             callbacks.append(
                 EarlyStopping(
                     patience=self.config.early_stopping_patience,
+                    min_delta=self.config.early_stopping_min_delta,
                     verbose=self.config.early_stopping_verbosity,
                     restore_best_weights=self.config.early_stopping_restore,
                 )
