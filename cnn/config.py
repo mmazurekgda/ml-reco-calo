@@ -29,8 +29,8 @@ class Config:
         # reduce lr
         "reduce_lr": True,
         "reduce_lr_verbosity": 1,
-        "reduce_lr_patience": 5,
-        "reduce_lr_cooldown": 5,
+        "reduce_lr_patience": 10,
+        "reduce_lr_cooldown": 10,
         # model checkpoint
         "model_checkpoint": True,
         "model_checkpoint_verbosity": 1,
