@@ -79,6 +79,7 @@ class Config:
 
     TEST_OPTIONS = {
         "testing": True,
+        "testing_every_n_epochs": 20,
         # general labels
         "testing_image_label_exp": "Gaussino",
         "testing_image_label_llabel": "Simulation Preliminary",

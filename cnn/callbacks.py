@@ -550,6 +550,10 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
 class CNNTestingAtTrainingCallback(CNNTestingCallback):
     def on_epoch_end(self, epoch, logs=None):
         self.prefix = "Monitoring"
+        epochs_no_mon = epoch % self.config.testing_every_n_epochs
+        if not epochs_no_mon:
+            epoch_to_go = self.config.testing_every_n_epochs - epochs_no_mon
+            self.log.info(f"Monitoring skipped. {epoch_to_go} more epochs to go.")
         samples = self.config.test_samples
         self.log.info(
             f"Monitoring of training for epoch {epoch} with {samples} samples..."
