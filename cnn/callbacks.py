@@ -551,8 +551,10 @@ class CNNTestingAtTrainingCallback(CNNTestingCallback):
     def on_epoch_end(self, epoch, logs=None):
         self.prefix = "Monitoring"
         epochs_no_mon = epoch % self.config.testing_every_n_epochs
-        if epochs_no_mon:
+        if epochs_no_mon or not epoch:
             epoch_to_go = self.config.testing_every_n_epochs - epochs_no_mon
+            if not epoch:
+                epoch_to_go = self.config.testing_every_n_epochs
             self.log.info(f"Monitoring skipped. {epoch_to_go} more epochs to go.")
             return
         samples = self.config.test_samples
