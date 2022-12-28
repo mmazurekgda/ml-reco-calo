@@ -350,7 +350,9 @@ def inference(
             max_dist_diff=3
             * abs(config.img_x_max - config.img_x_min)
             / config.img_width,
-            max_energy_diff=1.0,
+            # TODO: when energy is ready
+            # max_energy_diff=1.0,
+            max_energy_diff=None,
             energy_in_log=True,
         )
         matching["matched_true"].append(a[ids["matched_true"].astype(int)])
