@@ -283,12 +283,15 @@ class CNNTestingCallback(tf.keras.callbacks.Callback):
         if ylabel is not None:
             plt.ylabel(ylabel)
         if plot_type in ["hist", "scatter"]:
-            hep.plot.hist_legend(ax=ax, loc=1)
-            # hep.plot.mpl_magic(ax=ax)
-            hep.plot.ylow(ax=ax)
-            hep.plot.yscale_legend(ax=ax)
-            ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[-1] * 1.15)
-            fig.canvas.draw()
+            try:
+                hep.plot.hist_legend(ax=ax, loc=1)
+                # hep.plot.mpl_magic(ax=ax)
+                hep.plot.ylow(ax=ax)
+                hep.plot.yscale_legend(ax=ax)
+                ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[-1] * 1.15)
+                fig.canvas.draw()
+            except ValueError:
+                pass
         buf = io.BytesIO()
         plt.savefig(buf, format="png")
         plt.close(fig)

@@ -73,11 +73,14 @@ def plot_histograms(
     data_colors,
     bins=100,
     offset_bins_no=3,
-    histtype="step",
+    histtype="errorbar",
     **kwargs
 ):
     plot_bins = bins
-    merged = np.concatenate(data_tuple, -1)
+    try:
+        merged = np.concatenate(data_tuple, -1)
+    except ValueError:
+        return
     min_value, max_value = merged.min(), merged.max()
     span = abs(max_value - min_value)
     step_width = span / bins
@@ -98,7 +101,7 @@ def plot_histograms(
             hist,
             bins,
             ax=ax,
-            histtype="errorbar",
+            histtype=histtype,
             xerr=True,
             label=data_label,
             color=data_color,
@@ -158,7 +161,12 @@ def plot_energy_resolution(
             for x in xbinst
         ]
     )
-    hep.histplot(ybins, xbins, histtype="errorbar", xerr=True, yerr=ybins_stddev, ax=ax)
+    try:
+        hep.histplot(
+            ybins, xbins, histtype="errorbar", xerr=True, yerr=ybins_stddev, ax=ax
+        )
+    except ValueError:
+        pass
     if log_scale:
         ax.set_xscale("log")
     plt.ylabel(r"$\frac{\sigma}{E}$ [$\%$]")
